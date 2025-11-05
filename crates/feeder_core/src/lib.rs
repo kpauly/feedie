@@ -132,12 +132,22 @@ pub fn export_csv(rows: &[ImageInfo], path: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
+fn is_supported_image(path: &Path) -> bool {
+    match path.extension().and_then(|s| s.to_str()) {
+        Some(ext) => {
+            let ext = ext.to_ascii_lowercase();
+            matches!(ext.as_str(), "jpg" | "jpeg" | "png")
+        }
+        None => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::{self, File};
     use tempfile::NamedTempFile;
     use tempfile::tempdir;
-    use std::fs::{self, File};
 
     #[test]
     fn export_csv_writes_expected_headers_and_rows() -> Result<()> {
@@ -249,15 +259,5 @@ mod tests {
         files.sort();
         assert_eq!(files, vec!["a.jpg", "b.PNG"]);
         Ok(())
-    }
-}
-
-fn is_supported_image(path: &Path) -> bool {
-    match path.extension().and_then(|s| s.to_str()) {
-        Some(ext) => {
-            let ext = ext.to_ascii_lowercase();
-            matches!(ext.as_str(), "jpg" | "jpeg" | "png")
-        }
-        None => false,
     }
 }
