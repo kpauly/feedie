@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  spec-coverage:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check scenarios covered by tests
+        shell: pwsh
+        run: ./scripts/spec_check.ps1
+
+  rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format / Lint / Test
+        shell: pwsh
+        run: ./scripts/ci.ps1
+
