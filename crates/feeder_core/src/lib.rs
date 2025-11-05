@@ -1,6 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 /// Classification decision for an image/crop.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,14 +30,61 @@ pub struct ImageInfo {
     pub classification: Option<Classification>,
 }
 
+/// Options controlling how folder scanning behaves.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScanOptions {
+    /// When true, scan subdirectories recursively.
+    pub recursive: bool,
+}
+
 /// Scan a folder for images and produce basic `ImageInfo` entries.
 ///
-/// C0 skeleton: validates the path and returns an empty list.
-/// C1 will populate entries by listing jpg/jpeg/png files.
+/// C1: lists jpg/jpeg/png files (non-recursive by default).
 pub fn scan_folder(path: impl AsRef<Path>) -> Result<Vec<ImageInfo>> {
-    let _root = path.as_ref();
-    // Skeleton only; implemented in C1
-    Ok(Vec::new())
+    scan_folder_with(path, ScanOptions::default())
+}
+
+/// Scan a folder with options.
+pub fn scan_folder_with(path: impl AsRef<Path>, opts: ScanOptions) -> Result<Vec<ImageInfo>> {
+    let root = path.as_ref();
+    if !root.exists() {
+        anyhow::bail!("Path does not exist: {}", root.display());
+    }
+    if !root.is_dir() {
+        anyhow::bail!("Path is not a directory: {}", root.display());
+    }
+
+    let mut infos: Vec<ImageInfo> = Vec::new();
+
+    let walker = if opts.recursive {
+        WalkDir::new(root).into_iter()
+    } else {
+        WalkDir::new(root).max_depth(1).into_iter()
+    };
+
+    for entry in walker {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                // Skip unreadable entries, but keep scanning others
+                tracing::warn!("walkdir error: {}", e);
+                continue;
+            }
+        };
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if is_supported_image(path) {
+            infos.push(ImageInfo {
+                file: path.to_path_buf(),
+                present: false,
+                classification: None,
+            });
+        }
+    }
+
+    Ok(infos)
 }
 
 /// Export the provided rows to CSV with headers:
@@ -88,6 +136,8 @@ pub fn export_csv(rows: &[ImageInfo], path: impl AsRef<Path>) -> Result<()> {
 mod tests {
     use super::*;
     use tempfile::NamedTempFile;
+    use tempfile::tempdir;
+    use std::fs::{self, File};
 
     #[test]
     fn export_csv_writes_expected_headers_and_rows() -> Result<()> {
@@ -150,5 +200,64 @@ mod tests {
 
         assert!(recs.next().is_none());
         Ok(())
+    }
+
+    #[test]
+    fn scan_folder_empty_returns_empty() -> Result<()> {
+        let dir = tempdir()?;
+        let rows = scan_folder(dir.path())?;
+        assert!(rows.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn scan_folder_lists_only_images_non_recursive() -> Result<()> {
+        let dir = tempdir()?;
+        // Files in root
+        File::create(dir.path().join("a.JPG"))?;
+        File::create(dir.path().join("b.jpeg"))?;
+        File::create(dir.path().join("c.png"))?;
+        File::create(dir.path().join("not-image.txt"))?;
+        // Nested image should be ignored in non-recursive mode
+        let nested = dir.path().join("nested");
+        fs::create_dir(&nested)?;
+        File::create(nested.join("d.jpg"))?;
+
+        let rows = scan_folder_with(dir.path(), ScanOptions { recursive: false })?;
+        let mut files: Vec<String> = rows
+            .into_iter()
+            .map(|i| i.file.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        files.sort();
+        assert_eq!(files, vec!["a.JPG", "b.jpeg", "c.png"]);
+        Ok(())
+    }
+
+    #[test]
+    fn scan_folder_lists_images_recursive_when_enabled() -> Result<()> {
+        let dir = tempdir()?;
+        File::create(dir.path().join("a.jpg"))?;
+        let nested = dir.path().join("nested");
+        fs::create_dir(&nested)?;
+        File::create(nested.join("b.PNG"))?;
+
+        let rows = scan_folder_with(dir.path(), ScanOptions { recursive: true })?;
+        let mut files: Vec<String> = rows
+            .into_iter()
+            .map(|i| i.file.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        files.sort();
+        assert_eq!(files, vec!["a.jpg", "b.PNG"]);
+        Ok(())
+    }
+}
+
+fn is_supported_image(path: &Path) -> bool {
+    match path.extension().and_then(|s| s.to_str()) {
+        Some(ext) => {
+            let ext = ext.to_ascii_lowercase();
+            matches!(ext.as_str(), "jpg" | "jpeg" | "png")
+        }
+        None => false,
     }
 }
