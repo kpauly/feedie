@@ -19,7 +19,7 @@
   - [ ] Empty-folder UX message (Scenario 1)
   - [x] Optional: recursive scan toggle
 - [ ] **C2. Stage A — “animal present” filter (MVP stub)**
-  - [x] Heuristic placeholder to satisfy Scenario 2
+  - [x] Background-difference detector (pHash/dHash + K=2) to satisfy Scenario 2
   - [x] Interface to swap in YOLO later (feature flag `detector`)
 - [ ] **C3. Cropping**
   - [ ] Pass-through now; square-pad to 224 later
