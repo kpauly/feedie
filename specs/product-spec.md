@@ -13,6 +13,13 @@ Users point to an feeder camera SD card dump folder with thousands of frames; wa
 - File reorganization: retain only files with animal presence, sort into species folders.
 - Reference pack updater (check for updates, manual import).
 
+## UX Flow (v0)
+- Map kiezen (folder picker) toont direct een samenvatting: "Afbeeldingen in map: N". Er is vóór het scannen geen galerijweergave van alle bestanden.
+- Scannen start je expliciet. Tijdens scannen draait detectie op een achtergrondthread; de UI blijft responsief en toont een voortgangsbalk (X/Y, percentage). Knoppen "Kies map…" en "Scannen" zijn uitgeschakeld gedurende het scannen.
+- Na scannen toont de UI een samenvatting: "Dieren gevonden in X van Y frames".
+- De galerij toont standaard alleen frames met aanwezigheid (present-only). Er is een snelle schakelaar om te wisselen naar "Leeg" (frames zonder aanwezigheid).
+- Thumbnails worden lui (on‑demand) geladen met een per‑frame limiet om de UI vloeiend te houden bij grote aantallen.
+
 ## Non-goals v0
 - Training, cloud inference, mobile, multi-user sync.
 
@@ -27,5 +34,5 @@ Users point to an feeder camera SD card dump folder with thousands of frames; wa
 ## UX principles and i18n
 - Audience: absolute beginners; UI must be sleek and KISS.
 - Do not expose expert options unless strictly necessary; rely on good defaults.
-- Primary flow controls only: choose folder, Scan, toggle "Alleen aanwezige" (Present only), Export CSV.
+- Primary flow controls only: choose folder, Scan, galerijweergave (Aanwezig | Leeg), Export CSV.
 - Dutch-only UI for v0; structure all strings for later multi-language support.

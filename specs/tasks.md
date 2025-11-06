@@ -39,8 +39,11 @@
 - [ ] **G1. Shell**
   - [x] Main window + folder picker + “Scan” button (Scenario 1)
   - [x] Grid of thumbnails (virtualized)
+  - [ ] Pre-scan summary count on folder select (e.g., “Afbeeldingen in map: N”)
+  - [ ] Background scanning worker + progress bar (non-blocking UI)
 - [ ] **G2. Filters & review**
-  - [ ] Toggle “Present only” (Scenario 2)
+  - [ ] Default view shows only “Aanwezig” (present)
+  - [ ] Toggle to switch “Aanwezig | Leeg” (Scenario 2 / 2b)
   - [ ] “Review unsure” tray (Scenario 3)
 - [ ] **G3. Reference manager**
   - [ ] Add to reference → embedding → user index
