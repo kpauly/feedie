@@ -3,8 +3,8 @@
 Users point to an feeder camera SD card dump folder with thousands of frames; want animal presence + species offline and potentially file and folder reorganization.
 
 ## Scope v0
-- Stage A: optional “animal present” filter (YOLO-n or heuristic motion).
-- Stage B3: CLIP embeddings + HNSW k-NN over local gallery.
+- Single-stage classification pass per frame: generate embeddings (CLIP for v0) and immediately decide `present` + species.
+- K-NN over the local gallery/reference pack for species label; same pass also drives the “Aanwezig/Leeg” toggle.
 - Open-set: abstain if cos(top1) < T_min or (top1-top2) < Δ_min.
 
 ## Deliverables
@@ -26,10 +26,10 @@ Users point to an feeder camera SD card dump folder with thousands of frames; wa
 ## Performance targets
 - 5k frames < 10 min on i5/16GB (no GPU), skipping 80% as empty.
 
-## Presence detection (v0 default)
-- Use background-difference detection based on a compact image hash (64-bit dHash) and K=2 clustering in Hamming space to handle day/night modes.
-- Decide "present" for frames that are outliers relative to their assigned background cluster using an automatic threshold (mean + k·std; k≈2.5), with no user-visible tuning.
-- Keep a future option to swap in a YOLO-based detector behind a feature flag if MVP results are insufficient.
+## Classification & presence (v0 default)
+- Each frame is embedded with CLIP (Candle backend) and compared against the reference gallery via k-NN (HNSW). Presence is inferred directly: any confident species match flips `present=true`.
+- Abstain / mark as “Unknown” whenever cos(top1) < T_min or (top1 - top2) < Δ_min.
+- Longer-term: allow swapping in a dedicated classifier (e.g., EfficientNet) if CLIP+k-NN accuracy is insufficient; keep the interface the same so GUI/CSV flows do not change.
 
 ## UX principles and i18n
 - Audience: absolute beginners; UI must be sleek and KISS.

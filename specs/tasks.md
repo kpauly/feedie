@@ -18,10 +18,10 @@
   - [x] Select folder; list image files (jpg/jpeg/png) (Scenario 1)
   - [x] Empty-folder UX message (Scenario 1)
   - [x] Optional: recursive scan toggle
-- [ ] **C2. Stage A — “animal present” filter (MVP stub)**
-  - [x] Background-difference detector (pHash/dHash + K=2) to satisfy Scenario 2
-  - [x] Interface to swap in YOLO later (feature flag `detector`)
-  - [ ] Field validation on feeder SD dumps (current heuristic marks everything `leeg`; needs upgraded detector, e.g. YOLO/motion)
+- [ ] **C2. Single-pass inference pipeline**
+  - [ ] CLIP-based embedding + k-NN classification runs once per frame (derives both `present` + species)
+  - [ ] Hook to swap in a custom classifier (e.g., EfficientNet) if CLIP accuracy is insufficient
+  - [ ] Validate on feeder SD dumps; tune thresholds so “Aanwezig” aligns with observed animals
 - [ ] **C3. Cropping**
   - [ ] Pass-through now; square-pad to 224 later
 - [ ] **C4. Embeddings (CLIP via Candle)**
