@@ -1,23 +1,16 @@
-use anyhow::{Context, Result, anyhow};
-use image::{DynamicImage, RgbaImage, imageops::FilterType};
-use ndarray::{Array4, CowArray};
-use once_cell::sync::Lazy;
-use ort::{
-    GraphOptimizationLevel, SessionBuilder, environment::Environment, session::Session,
-    tensor::OrtOwnedTensor, value::Value,
-};
+use anyhow::Result;
+use image::{DynamicImage, imageops::FilterType};
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use walkdir::WalkDir;
+
+pub use classifier::{ClassifierConfig, EfficientNetClassifier, EfficientNetVariant};
+pub use training::{DatasetSample, DatasetSplit, TrainingConfig, load_dataset};
 
 /// Classification decision for an image/crop.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Decision {
-    /// Abstain from labeling; treat as unknown class.
     Unknown,
-    /// Labeled with a species name.
     Label(String),
 }
 
@@ -25,7 +18,6 @@ pub enum Decision {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Classification {
     pub decision: Decision,
-    /// Model similarity/confidence in [0,1].
     pub confidence: f32,
 }
 
@@ -33,9 +25,7 @@ pub struct Classification {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ImageInfo {
     pub file: PathBuf,
-    /// Whether an animal/bird is present.
     pub present: bool,
-    /// Optional classifier output.
     pub classification: Option<Classification>,
 }
 
@@ -55,14 +45,13 @@ pub fn scan_folder(path: impl AsRef<Path>) -> Result<Vec<ImageInfo>> {
 pub fn scan_folder_with(path: impl AsRef<Path>, opts: ScanOptions) -> Result<Vec<ImageInfo>> {
     let root = path.as_ref();
     if !root.exists() {
-        anyhow::bail!("Path does not exist: {}", root.display());
+        anyhow::bail!("Pad bestaat niet: {}", root.display());
     }
     if !root.is_dir() {
-        anyhow::bail!("Path is not a directory: {}", root.display());
+        anyhow::bail!("Pad is geen map: {}", root.display());
     }
 
     let mut infos: Vec<ImageInfo> = Vec::new();
-
     let walker = if opts.recursive {
         WalkDir::new(root).into_iter()
     } else {
@@ -73,7 +62,7 @@ pub fn scan_folder_with(path: impl AsRef<Path>, opts: ScanOptions) -> Result<Vec
         let entry = match entry {
             Ok(e) => e,
             Err(e) => {
-                tracing::warn!("walkdir error: {}", e);
+                tracing::warn!("walkdir fout: {}", e);
                 continue;
             }
         };
@@ -145,200 +134,337 @@ fn is_supported_image(path: &Path) -> bool {
     }
 }
 
-static ORT_ENV: Lazy<Arc<Environment>> = Lazy::new(|| {
-    Environment::builder()
-        .with_name("feeder-vision")
-        .build()
-        .expect("failed to initialize ONNX Runtime environment")
-        .into_arc()
-});
-
-/// Configuration for the ONNX-based EfficientNet classifier.
-#[derive(Debug, Clone)]
-pub struct ClassifierConfig {
-    pub model_path: PathBuf,
-    pub labels_path: PathBuf,
-    pub input_size: u32,
-    pub presence_threshold: f32,
-    pub mean: [f32; 3],
-    pub std: [f32; 3],
+fn resize_to_square(img: DynamicImage, size: u32) -> DynamicImage {
+    img.resize_exact(size, size, FilterType::Triangle)
 }
 
-impl Default for ClassifierConfig {
-    fn default() -> Self {
-        Self {
-            model_path: PathBuf::from("models/efficientnet_b0.onnx"),
-            labels_path: PathBuf::from("models/labels.txt"),
-            input_size: 512,
-            presence_threshold: 0.5,
-            mean: [0.485, 0.456, 0.406],
-            std: [0.229, 0.224, 0.225],
+mod classifier {
+    use super::{Classification, Decision, ImageInfo, resize_to_square};
+    use anyhow::{Context, Result, anyhow};
+    use candle_core::{D, DType, Device, Tensor};
+    use candle_nn::{self as nn, Module, VarBuilder};
+    use candle_transformers::models::efficientnet::{EfficientNet, MBConvConfig};
+    use image::{self, GenericImageView};
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[derive(Debug, Clone, Copy, Default)]
+    pub enum EfficientNetVariant {
+        #[default]
+        B0,
+        B1,
+        B2,
+    }
+    impl EfficientNetVariant {
+        fn configs(&self) -> Vec<MBConvConfig> {
+            match self {
+                Self::B0 => MBConvConfig::b0(),
+                Self::B1 => MBConvConfig::b1(),
+                Self::B2 => MBConvConfig::b2(),
+            }
         }
     }
-}
 
-/// EfficientNet classifier backed by ONNX Runtime.
-pub struct EfficientNetOrt {
-    session: Session,
-    labels: Vec<String>,
-    input_size: u32,
-    presence_threshold: f32,
-    mean: [f32; 3],
-    std: [f32; 3],
-}
-
-impl EfficientNetOrt {
-    pub fn new(cfg: &ClassifierConfig) -> Result<Self> {
-        if !cfg.model_path.exists() {
-            anyhow::bail!(
-                "Modelbestand ontbreekt: {}",
-                cfg.model_path.to_string_lossy()
-            );
-        }
-        if !cfg.labels_path.exists() {
-            anyhow::bail!(
-                "Labels-bestand ontbreekt: {}",
-                cfg.labels_path.to_string_lossy()
-            );
-        }
-        let env = ORT_ENV.clone();
-        let session = SessionBuilder::new(&env)?
-            .with_optimization_level(GraphOptimizationLevel::Level1)?
-            .with_model_from_file(&cfg.model_path)?;
-
-        let labels_raw = fs::read_to_string(&cfg.labels_path).context("labels niet te lezen")?;
-        let mut labels: Vec<String> = labels_raw
-            .lines()
-            .map(|l| l.trim())
-            .filter(|l| !l.is_empty())
-            .map(|l| l.to_string())
-            .collect();
-        if labels.is_empty() {
-            anyhow::bail!("labels-bestand bevat geen labels");
-        }
-        // ensure stable ordering
-        labels.dedup();
-
-        Ok(Self {
-            session,
-            labels,
-            input_size: cfg.input_size,
-            presence_threshold: cfg.presence_threshold,
-            mean: cfg.mean,
-            std: cfg.std,
-        })
+    /// Configuration for the Candle-based EfficientNet classifier.
+    #[derive(Debug, Clone)]
+    pub struct ClassifierConfig {
+        pub model_path: PathBuf,
+        pub labels_path: PathBuf,
+        pub variant: EfficientNetVariant,
+        pub input_size: u32,
+        pub presence_threshold: f32,
+        pub mean: [f32; 3],
+        pub std: [f32; 3],
+        pub background_labels: Vec<String>,
     }
 
-    pub fn classify_with_progress<F>(&self, rows: &mut [ImageInfo], mut progress: F) -> Result<()>
-    where
-        F: FnMut(usize, usize),
-    {
-        let total = rows.len();
-        if total == 0 {
-            return Ok(());
+    impl Default for ClassifierConfig {
+        fn default() -> Self {
+            Self {
+                model_path: PathBuf::from("models/efficientnet_b0.safetensors"),
+                labels_path: PathBuf::from("models/labels.csv"),
+                variant: EfficientNetVariant::B0,
+                input_size: 512,
+                presence_threshold: 0.5,
+                mean: [0.485, 0.456, 0.406],
+                std: [0.229, 0.224, 0.225],
+                background_labels: vec!["Achtergrond".to_string()],
+            }
         }
-        for (idx, info) in rows.iter_mut().enumerate() {
-            match self.classify_single(&info.file) {
-                Ok(result) => {
-                    info.present = result.present;
-                    info.classification = result.classification;
+    }
+
+    pub struct EfficientNetClassifier {
+        model: EfficientNet,
+        device: Device,
+        labels: Vec<String>,
+        input_size: u32,
+        presence_threshold: f32,
+        mean: [f32; 3],
+        std: [f32; 3],
+        background_labels: Vec<String>,
+    }
+
+    impl EfficientNetClassifier {
+        pub fn new(cfg: &ClassifierConfig) -> Result<Self> {
+            if !cfg.model_path.exists() {
+                anyhow::bail!(
+                    "Modelbestand ontbreekt: {}",
+                    cfg.model_path.to_string_lossy()
+                );
+            }
+            if !cfg.labels_path.exists() {
+                anyhow::bail!(
+                    "Labels-bestand ontbreekt: {}",
+                    cfg.labels_path.to_string_lossy()
+                );
+            }
+
+            let labels_raw =
+                fs::read_to_string(&cfg.labels_path).context("labels niet te lezen")?;
+            let mut labels: Vec<String> = labels_raw
+                .lines()
+                .map(|l| l.trim())
+                .filter(|l| !l.is_empty())
+                .map(|l| l.to_string())
+                .collect();
+            if labels.is_empty() {
+                anyhow::bail!("labels-bestand bevat geen labels");
+            }
+            labels.dedup();
+
+            let device = Device::Cpu;
+            let vb = unsafe {
+                VarBuilder::from_mmaped_safetensors(
+                    std::slice::from_ref(&cfg.model_path),
+                    DType::F32,
+                    &device,
+                )?
+            };
+            let model = EfficientNet::new(vb, cfg.variant.configs(), labels.len())?;
+
+            Ok(Self {
+                model,
+                device,
+                labels,
+                input_size: cfg.input_size,
+                presence_threshold: cfg.presence_threshold,
+                mean: cfg.mean,
+                std: cfg.std,
+                background_labels: cfg
+                    .background_labels
+                    .iter()
+                    .map(|s| s.to_ascii_lowercase())
+                    .collect(),
+            })
+        }
+
+        pub fn classify_with_progress<F>(
+            &self,
+            rows: &mut [ImageInfo],
+            mut progress: F,
+        ) -> Result<()>
+        where
+            F: FnMut(usize, usize),
+        {
+            let total = rows.len();
+            if total == 0 {
+                return Ok(());
+            }
+            for (idx, info) in rows.iter_mut().enumerate() {
+                match self.classify_single(&info.file) {
+                    Ok(result) => {
+                        info.present = result.present;
+                        info.classification = result.classification;
+                    }
+                    Err(err) => {
+                        tracing::warn!("Classifier fout voor {}: {err}", info.file.display());
+                        info.present = false;
+                        info.classification = None;
+                    }
                 }
-                Err(err) => {
-                    tracing::warn!("Classifier fout voor {}: {err}", info.file.display());
-                    info.present = false;
-                    info.classification = None;
+                progress(idx + 1, total);
+            }
+            Ok(())
+        }
+
+        fn classify_single(&self, path: &PathBuf) -> Result<ClassificationResult> {
+            let tensor = self.prepare_input(path)?;
+            let logits = self.model.forward(&tensor)?;
+            let probs = nn::ops::softmax(&logits, D::Minus1)?.squeeze(0)?;
+            let probs_vec = probs.to_vec1::<f32>()?;
+            if probs_vec.is_empty() {
+                anyhow::bail!("lege logits");
+            }
+            let (best_idx, &best_prob) = probs_vec
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .unwrap();
+            let label = self
+                .labels
+                .get(best_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("class_{best_idx}"));
+            let is_background = self
+                .background_labels
+                .iter()
+                .any(|bg| bg == &label.to_ascii_lowercase());
+            let present = best_prob >= self.presence_threshold && !is_background;
+            let classification = if present {
+                Some(Classification {
+                    decision: Decision::Label(label),
+                    confidence: best_prob,
+                })
+            } else {
+                Some(Classification {
+                    decision: Decision::Unknown,
+                    confidence: best_prob,
+                })
+            };
+            Ok(ClassificationResult {
+                present,
+                classification,
+            })
+        }
+
+        fn prepare_input(&self, path: &PathBuf) -> Result<Tensor> {
+            let img = image::open(path)
+                .with_context(|| format!("kan afbeelding niet openen: {}", path.display()))?;
+            let resized = resize_to_square(img, self.input_size);
+            let hw = (self.input_size * self.input_size) as usize;
+            let mut data = vec![0f32; 3 * hw];
+            for y in 0..self.input_size {
+                for x in 0..self.input_size {
+                    let pixel = resized.get_pixel(x, y);
+                    let idx = (y * self.input_size + x) as usize;
+                    data[idx] = normalize_channel(pixel.0[0], self.mean[0], self.std[0]);
+                    data[hw + idx] = normalize_channel(pixel.0[1], self.mean[1], self.std[1]);
+                    data[2 * hw + idx] = normalize_channel(pixel.0[2], self.mean[2], self.std[2]);
                 }
             }
-            progress(idx + 1, total);
+            Tensor::from_vec(
+                data,
+                (1, 3, self.input_size as usize, self.input_size as usize),
+                &self.device,
+            )
+            .map_err(|e| anyhow!("kon inputtensor niet bouwen: {e}"))
         }
-        Ok(())
     }
 
-    fn classify_single(&self, path: &Path) -> Result<ClassificationResult> {
-        let tensor = self.prepare_input(path)?;
-        let input_array = tensor.into_dyn();
-        let cow = CowArray::from(input_array.view());
-        let input = Value::from_array(self.session.allocator(), &cow)
-            .map_err(|e| anyhow!("kon inputtensor niet bouwen: {e}"))?;
-        let outputs: Vec<Value> = self.session.run(vec![input])?;
-        if outputs.is_empty() {
-            anyhow::bail!("model gaf geen output");
+    fn normalize_channel(value: u8, mean: f32, std: f32) -> f32 {
+        let v = value as f32 / 255.0;
+        (v - mean) / std
+    }
+
+    struct ClassificationResult {
+        present: bool,
+        classification: Option<Classification>,
+    }
+}
+
+pub mod training {
+    use anyhow::{Context, Result};
+    use std::path::{Path, PathBuf};
+
+    #[derive(Debug, Clone)]
+    pub struct DatasetSample {
+        pub image_path: PathBuf,
+        pub targets: Vec<f32>,
+        pub label_index: Option<usize>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct DatasetSplit {
+        pub name: String,
+        pub samples: Vec<DatasetSample>,
+        pub class_names: Vec<String>,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct TrainingConfig {
+        pub dataset_root: PathBuf,
+        pub variant: super::classifier::EfficientNetVariant,
+        pub epochs: usize,
+        pub batch_size: usize,
+        pub learning_rate: f64,
+    }
+
+    impl Default for TrainingConfig {
+        fn default() -> Self {
+            Self {
+                dataset_root: PathBuf::from("Voederhuiscamera.v2i.multiclass"),
+                variant: super::classifier::EfficientNetVariant::B0,
+                epochs: 10,
+                batch_size: 32,
+                learning_rate: 3e-4,
+            }
         }
-        let logits: OrtOwnedTensor<f32, _> = outputs[0].try_extract()?;
-        let view = logits.view();
-        let scores: Vec<f32> = view.iter().cloned().collect();
-        if scores.is_empty() {
-            anyhow::bail!("lege logits");
-        }
-        let probs = softmax(&scores);
-        let (best_idx, &best_prob) = probs
+    }
+
+    /// Load one split (train/valid/test) from a Roboflow export (class CSV + images).
+    pub fn load_split(split_dir: impl AsRef<Path>) -> Result<DatasetSplit> {
+        let dir = split_dir.as_ref();
+        let csv_path = dir.join("_classes.csv");
+        let mut rdr = csv::Reader::from_path(&csv_path)
+            .with_context(|| format!("kan CSV niet lezen: {}", csv_path.display()))?;
+        let headers = rdr
+            .headers()
+            .context("CSV zonder headers")?
             .iter()
-            .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap();
-        let label = self
-            .labels
-            .get(best_idx)
-            .cloned()
-            .unwrap_or_else(|| format!("class_{best_idx}"));
-        let present = best_prob >= self.presence_threshold;
-        let classification = if present {
-            Some(Classification {
-                decision: Decision::Label(label),
-                confidence: best_prob,
-            })
-        } else {
-            Some(Classification {
-                decision: Decision::Unknown,
-                confidence: best_prob,
-            })
-        };
-        Ok(ClassificationResult {
-            present,
-            classification,
+            .map(|h| h.to_string())
+            .collect::<Vec<_>>();
+        if headers.len() < 2 {
+            anyhow::bail!("CSV mist klasses: {}", csv_path.display());
+        }
+        let class_names = headers[1..].to_vec();
+        let mut samples = Vec::new();
+        for record in rdr.records() {
+            let record = record?;
+            if record.len() != headers.len() {
+                continue;
+            }
+            let filename = record.get(0).unwrap();
+            let mut targets = Vec::with_capacity(class_names.len());
+            for value in record.iter().skip(1) {
+                targets.push(value.parse::<f32>().unwrap_or(0.0));
+            }
+            let label_index = targets
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(idx, _)| idx);
+            samples.push(DatasetSample {
+                image_path: dir.join(filename),
+                targets,
+                label_index,
+            });
+        }
+        Ok(DatasetSplit {
+            name: dir
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "split".into()),
+            samples,
+            class_names,
         })
     }
 
-    fn prepare_input(&self, path: &Path) -> Result<Array4<f32>> {
-        let img = image::open(path)
-            .with_context(|| format!("kan afbeelding niet openen: {}", path.display()))?;
-        let resized = resize_to_square(img, self.input_size);
-        let mut array =
-            Array4::<f32>::zeros((1, 3, self.input_size as usize, self.input_size as usize));
-        for (x, y, pixel) in resized.enumerate_pixels() {
-            let [r, g, b, _] = pixel.0;
-            let coords = (y as usize, x as usize);
-            array[[0, 0, coords.0, coords.1]] = normalize_channel(r, self.mean[0], self.std[0]);
-            array[[0, 1, coords.0, coords.1]] = normalize_channel(g, self.mean[1], self.std[1]);
-            array[[0, 2, coords.0, coords.1]] = normalize_channel(b, self.mean[2], self.std[2]);
-        }
-        Ok(array)
+    /// Convenience helper that loads train/valid/test and logs the counts.
+    pub fn load_dataset(
+        cfg: &TrainingConfig,
+    ) -> Result<(DatasetSplit, DatasetSplit, DatasetSplit)> {
+        let train = load_split(cfg.dataset_root.join("train"))?;
+        let valid = load_split(cfg.dataset_root.join("valid"))?;
+        let test = load_split(cfg.dataset_root.join("test"))?;
+        tracing::info!(
+            "Dataset geladen: train={} valid={} test={} klassen={}",
+            train.samples.len(),
+            valid.samples.len(),
+            test.samples.len(),
+            train.class_names.len()
+        );
+        Ok((train, valid, test))
     }
-}
-
-fn resize_to_square(img: DynamicImage, size: u32) -> RgbaImage {
-    img.resize_exact(size, size, FilterType::Triangle)
-        .to_rgba8()
-}
-
-fn normalize_channel(value: u8, mean: f32, std: f32) -> f32 {
-    let v = value as f32 / 255.0;
-    (v - mean) / std
-}
-
-fn softmax(logits: &[f32]) -> Vec<f32> {
-    let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let exps: Vec<f32> = logits.iter().map(|&x| (x - max).exp()).collect();
-    let sum: f32 = exps.iter().sum();
-    if sum == 0.0 {
-        return vec![0.0; logits.len()];
-    }
-    exps.into_iter().map(|x| x / sum).collect()
-}
-
-struct ClassificationResult {
-    present: bool,
-    classification: Option<Classification>,
 }
 
 #[cfg(test)]

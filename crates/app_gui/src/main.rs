@@ -1,6 +1,6 @@
 use eframe::{App, Frame, NativeOptions, egui};
 use feeder_core::{
-    ClassifierConfig, EfficientNetOrt, ImageInfo, ScanOptions, export_csv, scan_folder_with,
+    ClassifierConfig, EfficientNetClassifier, ImageInfo, ScanOptions, export_csv, scan_folder_with,
 };
 use rfd::FileDialog;
 use std::collections::{HashMap, VecDeque};
@@ -193,7 +193,7 @@ impl App for UiApp {
                         let total = rows.len();
                         let _ = tx.send(ScanMsg::Progress(0, total));
                         let cfg = ClassifierConfig::default();
-                        let classifier = match EfficientNetOrt::new(&cfg) {
+                        let classifier = match EfficientNetClassifier::new(&cfg) {
                             Ok(c) => c,
                             Err(e) => {
                                 let _ =
