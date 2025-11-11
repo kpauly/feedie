@@ -18,21 +18,20 @@
   - [x] Select folder; list image files (jpg/jpeg/png) (Scenario 1)
   - [x] Empty-folder UX message (Scenario 1)
   - [x] Optional: recursive scan toggle
-- [ ] **C2. Single-pass inference pipeline**
-  - [ ] CLIP-based embedding + k-NN classification runs once per frame (derives both `present` + species)
-  - [ ] Hook to swap in a custom classifier (e.g., EfficientNet) if CLIP accuracy is insufficient
-  - [ ] Validate on feeder SD dumps; tune thresholds so “Aanwezig” aligns with observed animals
-- [ ] **C3. Cropping**
-  - [ ] Pass-through now; square-pad to 224 later
-- [ ] **C4. Embeddings (CLIP via Candle)**
-  - [ ] Load weights from `/models`; batch embedding
-  - [ ] Deterministic preprocessing tests
-- [ ] **C5. k-NN search (HNSW)**
-  - [ ] Load reference index; query top-k; persist user adds
-- [ ] **C6. Open-set safety**
-  - [ ] Thresholds: `cos< T_min` or `(top1-top2)< Δ_min` → “Unknown”
-  - [ ] Configurable T_min & Δ_min; unit tests
-- [ ] **C7. CSV export**
+- [ ] **C2. Single-pass EfficientNet inference**
+  - [x] Candle EfficientNet classifier wrapper (`ClassifierConfig`, thresholds, background labels)
+  - [ ] Bundle baseline `.safetensors` + `labels.csv` in `/models`
+  - [ ] Validate thresholds on feeder SD dumps; document recommended defaults
+- [ ] **C3. Model training pipeline**
+  - [x] Load Roboflow `_classes.csv` splits (train/valid/test) into `DatasetSplit`
+  - [ ] Candle training script (data loader, augmentations, EfficientNet fine-tune loop)
+  - [ ] Export `.safetensors` + metrics artifact; hook into `/models`
+- [ ] **C4. Cropping / preprocessing**
+  - [ ] Confirm 512×512 pipeline; pad/resize helper for inference + training reuse
+- [ ] **C5. Open-set safety**
+  - [ ] Configurable presence threshold & background class list
+  - [ ] Unit tests covering Unknown vs species classification
+- [ ] **C6. CSV export**
   - [x] `file,present,species,confidence`
   - [x] Disable when no frames selected (Scenario 1)
 
@@ -68,8 +67,8 @@
 
 ## Packaging
 - [ ] **P1. Config & models**
-  - [ ] `/models` lookup + friendly missing-model error
-  - [ ] App config (toml/json): thresholds, batch size
+  - [ ] `/models` lookup + friendly missing-model error (weights + labels)
+  - [ ] App config (toml/json): thresholds, background labels, batch size
 - [ ] **P2. Release**
   - [ ] `cargo build --release`; smoke on Windows 11
   - [ ] (Optional) self-update later via `self_update`
