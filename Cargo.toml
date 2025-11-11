@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "crates/feeder_core",
-    "crates/app_gui"
+    "crates/app_gui",
+    "crates/effnet_train"
 ]
 resolver = "2"
 

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use candle_core::{Device, Tensor};
 use image::{DynamicImage, imageops::FilterType};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -138,15 +139,41 @@ fn resize_to_square(img: DynamicImage, size: u32) -> DynamicImage {
     img.resize_exact(size, size, FilterType::Triangle)
 }
 
+/// Convert an image file into a normalized tensor (CHW) on the provided device.
+pub fn load_image_tensor(
+    path: &Path,
+    size: u32,
+    mean: [f32; 3],
+    std: [f32; 3],
+    device: &Device,
+) -> Result<Tensor> {
+    let img = image::open(path)?;
+    let resized = resize_to_square(img, size).to_rgba8();
+    let hw = (size * size) as usize;
+    let mut data = vec![0f32; hw * 3];
+    for (y, x, pixel) in resized.enumerate_pixels() {
+        let idx = (y * size + x) as usize;
+        data[idx] = normalize_channel(pixel.0[0], mean[0], std[0]);
+        data[hw + idx] = normalize_channel(pixel.0[1], mean[1], std[1]);
+        data[2 * hw + idx] = normalize_channel(pixel.0[2], mean[2], std[2]);
+    }
+    let tensor = Tensor::from_vec(data, (3, size as usize, size as usize), device)?;
+    Ok(tensor)
+}
+
+fn normalize_channel(value: u8, mean: f32, std: f32) -> f32 {
+    let v = value as f32 / 255.0;
+    (v - mean) / std
+}
+
 mod classifier {
-    use super::{Classification, Decision, ImageInfo, resize_to_square};
-    use anyhow::{Context, Result, anyhow};
+    use super::{Classification, Decision, ImageInfo, load_image_tensor};
+    use anyhow::{Context, Result};
     use candle_core::{D, DType, Device, Tensor};
     use candle_nn::{self as nn, Module, VarBuilder};
     use candle_transformers::models::efficientnet::{EfficientNet, MBConvConfig};
-    use image::{self, GenericImageView};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[derive(Debug, Clone, Copy, Default)]
     pub enum EfficientNetVariant {
@@ -156,7 +183,7 @@ mod classifier {
         B2,
     }
     impl EfficientNetVariant {
-        fn configs(&self) -> Vec<MBConvConfig> {
+        pub fn configs(&self) -> Vec<MBConvConfig> {
             match self {
                 Self::B0 => MBConvConfig::b0(),
                 Self::B1 => MBConvConfig::b1(),
@@ -287,7 +314,7 @@ mod classifier {
             Ok(())
         }
 
-        fn classify_single(&self, path: &PathBuf) -> Result<ClassificationResult> {
+        fn classify_single(&self, path: &Path) -> Result<ClassificationResult> {
             let tensor = self.prepare_input(path)?;
             let logits = self.model.forward(&tensor)?;
             let probs = nn::ops::softmax(&logits, D::Minus1)?.squeeze(0)?;
@@ -327,33 +354,11 @@ mod classifier {
             })
         }
 
-        fn prepare_input(&self, path: &PathBuf) -> Result<Tensor> {
-            let img = image::open(path)
-                .with_context(|| format!("kan afbeelding niet openen: {}", path.display()))?;
-            let resized = resize_to_square(img, self.input_size);
-            let hw = (self.input_size * self.input_size) as usize;
-            let mut data = vec![0f32; 3 * hw];
-            for y in 0..self.input_size {
-                for x in 0..self.input_size {
-                    let pixel = resized.get_pixel(x, y);
-                    let idx = (y * self.input_size + x) as usize;
-                    data[idx] = normalize_channel(pixel.0[0], self.mean[0], self.std[0]);
-                    data[hw + idx] = normalize_channel(pixel.0[1], self.mean[1], self.std[1]);
-                    data[2 * hw + idx] = normalize_channel(pixel.0[2], self.mean[2], self.std[2]);
-                }
-            }
-            Tensor::from_vec(
-                data,
-                (1, 3, self.input_size as usize, self.input_size as usize),
-                &self.device,
-            )
-            .map_err(|e| anyhow!("kon inputtensor niet bouwen: {e}"))
+        fn prepare_input(&self, path: &Path) -> Result<Tensor> {
+            let tensor =
+                load_image_tensor(path, self.input_size, self.mean, self.std, &self.device)?;
+            Ok(tensor.unsqueeze(0)?)
         }
-    }
-
-    fn normalize_channel(value: u8, mean: f32, std: f32) -> f32 {
-        let v = value as f32 / 255.0;
-        (v - mean) / std
     }
 
     struct ClassificationResult {
