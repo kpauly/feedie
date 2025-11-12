@@ -1,9 +1,10 @@
 use eframe::{App, Frame, NativeOptions, egui};
 use feeder_core::{
-    ClassifierConfig, EfficientNetClassifier, ImageInfo, ScanOptions, export_csv, scan_folder_with,
+    ClassifierConfig, Decision, EfficientVitClassifier, ImageInfo, ScanOptions, export_csv,
+    scan_folder_with,
 };
 use rfd::FileDialog;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -47,10 +48,15 @@ struct UiApp {
     // Thumbnail cache (basic LRU)
     thumbs: HashMap<PathBuf, egui::TextureHandle>,
     thumb_keys: VecDeque<PathBuf>,
+    selected_indices: BTreeSet<usize>,
+    selection_anchor: Option<usize>,
 }
 
 const THUMB_SIZE: u32 = 120;
 const MAX_THUMBS: usize = 256;
+const MAX_THUMB_LOAD_PER_FRAME: usize = 12;
+const CARD_WIDTH: f32 = THUMB_SIZE as f32 + 90.0;
+const CARD_HEIGHT: f32 = THUMB_SIZE as f32 + 110.0;
 
 enum ScanMsg {
     Progress(usize, usize),     // scanned, total
@@ -90,6 +96,187 @@ impl UiApp {
             }
         }
     }
+
+    fn filtered_indices(&self) -> Vec<usize> {
+        self.rijen
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, info)| match self.view {
+                ViewMode::Aanwezig if info.present => Some(idx),
+                ViewMode::Leeg if !info.present => Some(idx),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn handle_select_shortcuts(&mut self, ctx: &egui::Context, filtered: &[usize]) {
+        let mut trigger_select_all = false;
+        ctx.input_mut(|input| {
+            if input.consume_key(egui::Modifiers::COMMAND, egui::Key::A) {
+                trigger_select_all = true;
+            }
+        });
+        if trigger_select_all {
+            self.select_all(filtered);
+        }
+    }
+
+    fn select_single(&mut self, idx: usize) {
+        self.selected_indices.clear();
+        self.selected_indices.insert(idx);
+        self.selection_anchor = Some(idx);
+    }
+
+    fn toggle_selection(&mut self, idx: usize) {
+        if self.selected_indices.contains(&idx) {
+            self.selected_indices.remove(&idx);
+        } else {
+            self.selected_indices.insert(idx);
+            self.selection_anchor = Some(idx);
+        }
+    }
+
+    fn select_range_in_view(&mut self, filtered: &[usize], target_idx: usize) {
+        let Some(anchor_idx) = self.selection_anchor else {
+            self.select_single(target_idx);
+            return;
+        };
+        let Some(anchor_pos) = filtered.iter().position(|&v| v == anchor_idx) else {
+            self.select_single(target_idx);
+            return;
+        };
+        let Some(target_pos) = filtered.iter().position(|&v| v == target_idx) else {
+            self.select_single(target_idx);
+            return;
+        };
+        let (start, end) = if anchor_pos <= target_pos {
+            (anchor_pos, target_pos)
+        } else {
+            (target_pos, anchor_pos)
+        };
+        self.selected_indices.clear();
+        for &idx in &filtered[start..=end] {
+            self.selected_indices.insert(idx);
+        }
+        self.selection_anchor = Some(target_idx);
+    }
+
+    fn select_all(&mut self, filtered: &[usize]) {
+        self.selected_indices.clear();
+        for &idx in filtered {
+            self.selected_indices.insert(idx);
+        }
+        self.selection_anchor = filtered.first().copied();
+    }
+
+    fn handle_selection_click(
+        &mut self,
+        filtered: &[usize],
+        idx: usize,
+        modifiers: egui::Modifiers,
+    ) {
+        if modifiers.shift {
+            self.select_range_in_view(filtered, idx);
+        } else if modifiers.command {
+            self.toggle_selection(idx);
+        } else {
+            self.select_single(idx);
+        }
+    }
+
+    fn thumbnail_caption(info: &ImageInfo) -> String {
+        match &info.classification {
+            Some(classification) => {
+                let label = match &classification.decision {
+                    Decision::Label(name) => name.clone(),
+                    Decision::Unknown => "Unknown".to_string(),
+                };
+                format!("{label} ({:.1}%)", classification.confidence * 100.0)
+            }
+            None => "Geen classificatie".to_string(),
+        }
+    }
+
+    fn draw_thumbnail_card(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &egui::Context,
+        idx: usize,
+        is_selected: bool,
+        loaded_this_frame: &mut usize,
+    ) -> egui::Response {
+        let (file_path, file_label, caption) = {
+            let info = &self.rijen[idx];
+            let label = info
+                .file
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| info.file.to_string_lossy().to_string());
+            let caption = Self::thumbnail_caption(info);
+            (info.file.clone(), label, caption)
+        };
+
+        let (rect, response) =
+            ui.allocate_exact_size(egui::vec2(CARD_WIDTH, CARD_HEIGHT), egui::Sense::click());
+
+        let visuals = ui.visuals();
+        let fill = if is_selected {
+            visuals.selection.bg_fill
+        } else {
+            visuals.widgets.noninteractive.bg_fill
+        };
+        let stroke = if is_selected {
+            visuals.selection.stroke
+        } else {
+            visuals.widgets.noninteractive.bg_stroke
+        };
+        ui.painter().rect_filled(rect, 8.0, fill);
+        ui.painter()
+            .rect_stroke(rect, 8.0, stroke, egui::StrokeKind::Outside);
+
+        let builder = egui::UiBuilder::new()
+            .max_rect(rect.shrink2(egui::vec2(8.0, 8.0)))
+            .layout(egui::Layout::top_down(egui::Align::Center));
+        let mut child = ui.new_child(builder);
+        child.set_width(rect.width() - 16.0);
+        child.label(egui::RichText::new(file_label.clone()).small());
+        child.add_space(4.0);
+
+        let had_tex = self.thumbs.contains_key(&file_path);
+        let tex_id = if had_tex || *loaded_this_frame < MAX_THUMB_LOAD_PER_FRAME {
+            let tex = self.get_or_load_thumb(ctx, &file_path);
+            if tex.is_some() && !had_tex {
+                *loaded_this_frame += 1;
+            }
+            tex
+        } else {
+            None
+        };
+        let image_size = egui::Vec2::splat(THUMB_SIZE as f32);
+        if let Some(id) = tex_id {
+            child.add(
+                egui::Image::new((id, image_size))
+                    .maintain_aspect_ratio(true)
+                    .sense(egui::Sense::hover()),
+            );
+        } else {
+            let (img_rect, _) = child.allocate_exact_size(image_size, egui::Sense::hover());
+            child
+                .painter()
+                .rect_filled(img_rect, 4.0, egui::Color32::from_gray(40));
+            child.painter().rect_stroke(
+                img_rect,
+                4.0,
+                egui::Stroke::new(1.0, egui::Color32::DARK_GRAY),
+                egui::StrokeKind::Inside,
+            );
+        }
+
+        child.add_space(4.0);
+        child.label(egui::RichText::new(caption).small());
+
+        response
+    }
 }
 
 impl App for UiApp {
@@ -109,6 +296,8 @@ impl App for UiApp {
                         self.rijen = rows;
                         self.thumbs.clear();
                         self.thumb_keys.clear();
+                        self.selected_indices.clear();
+                        self.selection_anchor = None;
                         let totaal = self.total_files;
                         let aanwezig = self.rijen.iter().filter(|r| r.present).count();
                         self.status = format!(
@@ -193,7 +382,7 @@ impl App for UiApp {
                         let total = rows.len();
                         let _ = tx.send(ScanMsg::Progress(0, total));
                         let cfg = ClassifierConfig::default();
-                        let classifier = match EfficientNetClassifier::new(&cfg) {
+                        let classifier = match EfficientVitClassifier::new(&cfg) {
                             Ok(c) => c,
                             Err(e) => {
                                 let _ =
@@ -285,68 +474,35 @@ impl App for UiApp {
                     }
                 });
 
-                // Filter rows for current view
-                let filtered: Vec<PathBuf> = match self.view {
-                    ViewMode::Aanwezig => self
-                        .rijen
-                        .iter()
-                        .filter(|r| r.present)
-                        .map(|r| r.file.clone())
-                        .collect(),
-                    ViewMode::Leeg => self
-                        .rijen
-                        .iter()
-                        .filter(|r| !r.present)
-                        .map(|r| r.file.clone())
-                        .collect(),
-                };
+                let filtered = self.filtered_indices();
+                self.handle_select_shortcuts(ctx, &filtered);
 
-                ui.add_space(6.0);
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false; 2])
-                    .show(ui, |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            let thumb_px = THUMB_SIZE as f32;
-                            let desired = egui::Vec2::new(thumb_px, thumb_px);
+                if filtered.is_empty() {
+                    ui.label("Geen frames om te tonen in deze weergave.");
+                } else {
+                    ui.add_space(6.0);
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false; 2])
+                        .show(ui, |ui| {
                             let mut loaded_this_frame = 0usize;
-                            const MAX_LOAD_PER_FRAME: usize = 12;
-
-                            for path in filtered {
-                                let (resp, painter) =
-                                    ui.allocate_painter(desired, egui::Sense::hover());
-                                let r = resp.rect;
-                                let had_tex = self.thumbs.contains_key(&path);
-                                if !had_tex && loaded_this_frame >= MAX_LOAD_PER_FRAME {
-                                    painter.rect_filled(r, 4.0, egui::Color32::from_gray(40));
-                                    painter.rect_stroke(
-                                        r,
-                                        4.0,
-                                        egui::Stroke::new(1.0, egui::Color32::DARK_GRAY),
-                                        egui::StrokeKind::Inside,
+                            ui.horizontal_wrapped(|ui| {
+                                for &idx in &filtered {
+                                    let is_selected = self.selected_indices.contains(&idx);
+                                    let response = self.draw_thumbnail_card(
+                                        ui,
+                                        ctx,
+                                        idx,
+                                        is_selected,
+                                        &mut loaded_this_frame,
                                     );
-                                    continue;
-                                }
-                                if let Some(id) = self.get_or_load_thumb(ctx, &path) {
-                                    if !had_tex {
-                                        loaded_this_frame += 1;
+                                    if response.clicked() {
+                                        let modifiers = ctx.input(|i| i.modifiers);
+                                        self.handle_selection_click(&filtered, idx, modifiers);
                                     }
-                                    let uv = egui::Rect::from_min_max(
-                                        egui::pos2(0.0, 0.0),
-                                        egui::pos2(1.0, 1.0),
-                                    );
-                                    painter.image(id, uv, r, egui::Color32::WHITE);
-                                } else {
-                                    painter.rect_filled(r, 4.0, egui::Color32::from_gray(40));
-                                    painter.rect_stroke(
-                                        r,
-                                        4.0,
-                                        egui::Stroke::new(1.0, egui::Color32::DARK_GRAY),
-                                        egui::StrokeKind::Inside,
-                                    );
                                 }
-                            }
+                            });
                         });
-                    });
+                }
             }
         });
     }

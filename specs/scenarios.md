@@ -24,3 +24,9 @@ Given a crop with low similarity to any reference
 When classified via k-NN
 Then the label is "Unknown"
 And confidence is below the threshold
+
+Scenario 4: Thumbnail review & selection
+Given a completed scan with both present and empty frames
+When the user toggles between "Aanwezig" and "Leeg"
+Then each thumbnail shows the filename above, the predicted species + confidence below, and lazy-loads as needed
+And the user can select frames using click, Ctrl-click, Shift-range, or Ctrl-A for later context actions

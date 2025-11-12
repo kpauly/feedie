@@ -1576,6 +1576,7 @@ dependencies = [
  "candle-transformers",
  "csv",
  "image",
+ "rayon",
  "safetensors 0.6.2",
  "serde",
  "tempfile",

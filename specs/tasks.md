@@ -21,6 +21,7 @@
 - [ ] **C2. Single-pass EfficientViT inference**
   - [x] Candle EfficientViT classifier wrapper (`ClassifierConfig`, thresholds, background labels)
   - [x] Bundle baseline `feeder-efficientvit-m0.safetensors` + `feeder-labels.csv` in `/models`
+  - [x] CPU-side batching + parallel preprocessing for throughput (default batch size = 8)
   - [ ] Validate thresholds on feeder SD dumps; document recommended defaults
 - [ ] **C3. Model training pipeline**
   - [x] Load Roboflow `_classes.csv` splits (train/valid/test) into `DatasetSplit`
@@ -40,9 +41,10 @@
 ## GUI (egui)
 - [ ] **G1. Shell**
   - [x] Main window + folder picker + “Scan” button (Scenario 1)
-  - [x] Grid of thumbnails (virtualized)
+  - [x] Grid of thumbnails (virtualized) with lazy loading
   - [x] Pre-scan summary count on folder select (e.g., “Afbeeldingen in map: N”)
   - [x] Background scanning worker + progress bar (non-blocking UI)
+  - [x] Thumbnail cards show bestandsnaam + soort + vertrouwen; Windows-style multi-select in Aanwezig/Leeg tabs
   - [ ] Progress bar should reach 100% + keep requesting repaint after scans so thumbnails load without manual interaction
 - [ ] **G2. Filters & review**
   - [x] Default view shows only “Aanwezig” (present)

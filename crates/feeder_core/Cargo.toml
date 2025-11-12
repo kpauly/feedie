@@ -10,6 +10,7 @@ candle-nn = "0.9.1"
 candle-transformers = "0.9.1"
 csv = "1.4.0"
 image = "0.25.8"
+rayon = "1.10.0"
 safetensors = "0.6.2"
 serde = { version = "1.0.228", features = ["derive"] }
 tracing = "0.1.41"

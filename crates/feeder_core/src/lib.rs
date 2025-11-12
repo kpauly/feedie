@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-pub use classifier::{ClassifierConfig, EfficientNetClassifier, EfficientNetVariant};
+pub use classifier::{
+    ClassifierConfig, EfficientNetVariant, EfficientVitClassifier, EfficientVitVariant,
+};
 pub use training::{DatasetSample, DatasetSplit, TrainingConfig, load_dataset};
 
 /// Classification decision for an image/crop.
@@ -147,6 +149,17 @@ pub fn load_image_tensor(
     std: [f32; 3],
     device: &Device,
 ) -> Result<Tensor> {
+    let data = load_image_tensor_data(path, size, mean, std)?;
+    let tensor = Tensor::from_vec(data, (3, size as usize, size as usize), device)?;
+    Ok(tensor)
+}
+
+fn load_image_tensor_data(
+    path: &Path,
+    size: u32,
+    mean: [f32; 3],
+    std: [f32; 3],
+) -> Result<Vec<f32>> {
     let img = image::open(path)?;
     let resized = resize_to_square(img, size).to_rgba8();
     let hw = (size * size) as usize;
@@ -157,8 +170,7 @@ pub fn load_image_tensor(
         data[hw + idx] = normalize_channel(pixel.0[1], mean[1], std[1]);
         data[2 * hw + idx] = normalize_channel(pixel.0[2], mean[2], std[2]);
     }
-    let tensor = Tensor::from_vec(data, (3, size as usize, size as usize), device)?;
-    Ok(tensor)
+    Ok(data)
 }
 
 fn normalize_channel(value: u8, mean: f32, std: f32) -> f32 {
@@ -167,13 +179,17 @@ fn normalize_channel(value: u8, mean: f32, std: f32) -> f32 {
 }
 
 mod classifier {
-    use super::{Classification, Decision, ImageInfo, load_image_tensor};
+    use super::{Classification, Decision, ImageInfo, load_image_tensor_data};
     use anyhow::{Context, Result};
     use candle_core::{D, DType, Device, Tensor};
-    use candle_nn::{self as nn, Module, VarBuilder};
-    use candle_transformers::models::efficientnet::{EfficientNet, MBConvConfig};
+    use candle_nn::{self as nn, Func, Module, VarBuilder};
+    use candle_transformers::models::efficientnet::MBConvConfig;
+    use candle_transformers::models::efficientvit::{
+        self as efficientvit_model, Config as EfficientVitConfig,
+    };
+    use rayon::prelude::*;
     use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     #[derive(Debug, Clone, Copy, Default)]
     pub enum EfficientNetVariant {
@@ -182,6 +198,7 @@ mod classifier {
         B1,
         B2,
     }
+
     impl EfficientNetVariant {
         pub fn configs(&self) -> Vec<MBConvConfig> {
             match self {
@@ -192,36 +209,62 @@ mod classifier {
         }
     }
 
-    /// Configuration for the Candle-based EfficientNet classifier.
+    #[derive(Debug, Clone, Copy, Default)]
+    pub enum EfficientVitVariant {
+        #[default]
+        M0,
+        M1,
+        M2,
+        M3,
+        M4,
+        M5,
+    }
+
+    impl EfficientVitVariant {
+        pub fn config(&self) -> EfficientVitConfig {
+            match self {
+                Self::M0 => EfficientVitConfig::m0(),
+                Self::M1 => EfficientVitConfig::m1(),
+                Self::M2 => EfficientVitConfig::m2(),
+                Self::M3 => EfficientVitConfig::m3(),
+                Self::M4 => EfficientVitConfig::m4(),
+                Self::M5 => EfficientVitConfig::m5(),
+            }
+        }
+    }
+
+    /// Configuration for the Candle-based EfficientViT classifier.
     #[derive(Debug, Clone)]
     pub struct ClassifierConfig {
         pub model_path: PathBuf,
         pub labels_path: PathBuf,
-        pub variant: EfficientNetVariant,
+        pub variant: EfficientVitVariant,
         pub input_size: u32,
         pub presence_threshold: f32,
         pub mean: [f32; 3],
         pub std: [f32; 3],
         pub background_labels: Vec<String>,
+        pub batch_size: usize,
     }
 
     impl Default for ClassifierConfig {
         fn default() -> Self {
             Self {
-                model_path: PathBuf::from("models/efficientnet_b0.safetensors"),
-                labels_path: PathBuf::from("models/labels.csv"),
-                variant: EfficientNetVariant::B0,
-                input_size: 512,
+                model_path: PathBuf::from("models/feeder-efficientvit-m0.safetensors"),
+                labels_path: PathBuf::from("models/feeder-labels.csv"),
+                variant: EfficientVitVariant::M0,
+                input_size: 224,
                 presence_threshold: 0.5,
                 mean: [0.485, 0.456, 0.406],
                 std: [0.229, 0.224, 0.225],
                 background_labels: vec!["Achtergrond".to_string()],
+                batch_size: 8,
             }
         }
     }
 
-    pub struct EfficientNetClassifier {
-        model: EfficientNet,
+    pub struct EfficientVitClassifier {
+        model: Func<'static>,
         device: Device,
         labels: Vec<String>,
         input_size: u32,
@@ -229,9 +272,10 @@ mod classifier {
         mean: [f32; 3],
         std: [f32; 3],
         background_labels: Vec<String>,
+        batch_size: usize,
     }
 
-    impl EfficientNetClassifier {
+    impl EfficientVitClassifier {
         pub fn new(cfg: &ClassifierConfig) -> Result<Self> {
             if !cfg.model_path.exists() {
                 anyhow::bail!(
@@ -267,7 +311,8 @@ mod classifier {
                     &device,
                 )?
             };
-            let model = EfficientNet::new(vb, cfg.variant.configs(), labels.len())?;
+            let vit_config = cfg.variant.config();
+            let model = efficientvit_model::efficientvit(&vit_config, labels.len(), vb)?;
 
             Ok(Self {
                 model,
@@ -282,6 +327,7 @@ mod classifier {
                     .iter()
                     .map(|s| s.to_ascii_lowercase())
                     .collect(),
+                batch_size: cfg.batch_size.max(1),
             })
         }
 
@@ -297,32 +343,113 @@ mod classifier {
             if total == 0 {
                 return Ok(());
             }
-            for (idx, info) in rows.iter_mut().enumerate() {
-                match self.classify_single(&info.file) {
-                    Ok(result) => {
-                        info.present = result.present;
-                        info.classification = result.classification;
-                    }
-                    Err(err) => {
-                        tracing::warn!("Classifier fout voor {}: {err}", info.file.display());
-                        info.present = false;
-                        info.classification = None;
-                    }
-                }
-                progress(idx + 1, total);
+
+            let mut processed = 0usize;
+            for chunk in rows.chunks_mut(self.batch_size) {
+                self.classify_chunk(chunk)?;
+                processed += chunk.len();
+                progress(processed.min(total), total);
             }
             Ok(())
         }
 
-        fn classify_single(&self, path: &Path) -> Result<ClassificationResult> {
-            let tensor = self.prepare_input(path)?;
-            let logits = self.model.forward(&tensor)?;
-            let probs = nn::ops::softmax(&logits, D::Minus1)?.squeeze(0)?;
-            let probs_vec = probs.to_vec1::<f32>()?;
-            if probs_vec.is_empty() {
+        fn classify_chunk(&self, chunk: &mut [ImageInfo]) -> Result<()> {
+            if chunk.is_empty() {
+                return Ok(());
+            }
+
+            let inputs: Vec<_> = chunk
+                .iter()
+                .enumerate()
+                .map(|(idx, info)| (idx, info.file.clone()))
+                .collect();
+
+            let mut prepared: Vec<_> = inputs
+                .into_par_iter()
+                .map(|(idx, path)| {
+                    let data =
+                        load_image_tensor_data(&path, self.input_size, self.mean, self.std);
+                    (idx, path, data)
+                })
+                .collect();
+            prepared.sort_by_key(|(idx, _, _)| *idx);
+
+            let mut tensor_order: Vec<usize> = Vec::new();
+            let mut tensors: Vec<Tensor> = Vec::new();
+            for (idx, path, data_res) in prepared {
+                match data_res {
+                    Ok(data) => match self.tensor_from_data(data) {
+                        Ok(tensor) => {
+                            tensor_order.push(idx);
+                            tensors.push(tensor);
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                "Tensor bouwen mislukt voor {}: {err}",
+                                path.display()
+                            );
+                            if let Some(info) = chunk.get_mut(idx) {
+                                info.present = false;
+                                info.classification = None;
+                            }
+                        }
+                    },
+                    Err(err) => {
+                        tracing::warn!("Afbeelding laden mislukt voor {}: {err}", path.display());
+                        if let Some(info) = chunk.get_mut(idx) {
+                            info.present = false;
+                            info.classification = None;
+                        }
+                    }
+                }
+            }
+
+            if tensors.is_empty() {
+                return Ok(());
+            }
+
+            let views = tensors.iter().collect::<Vec<_>>();
+            let batch = Tensor::stack(&views, 0)?;
+            let logits = self.model.forward(&batch)?;
+            let probs = nn::ops::softmax(&logits, D::Minus1)?;
+            let probs_rows = probs.to_vec2::<f32>()?;
+
+            for (row_probs, idx_in_chunk) in probs_rows.into_iter().zip(tensor_order.into_iter())
+            {
+                if let Some(info) = chunk.get_mut(idx_in_chunk) {
+                    match self.build_result_from_probs(&row_probs) {
+                        Ok(result) => {
+                            info.present = result.present;
+                            info.classification = result.classification;
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                "Resultaat opbouwen mislukt voor {}: {err}",
+                                info.file.display()
+                            );
+                            info.present = false;
+                            info.classification = None;
+                        }
+                    }
+                }
+            }
+
+            Ok(())
+        }
+
+        fn tensor_from_data(&self, data: Vec<f32>) -> Result<Tensor> {
+            Ok(Tensor::from_vec(
+                data,
+                (3, self.input_size as usize, self.input_size as usize),
+                &self.device,
+            )?)
+        }
+
+        fn build_result_from_probs(&self, probs: &[f32]) -> Result<ClassificationResult> {
+            if probs.is_empty() {
                 anyhow::bail!("lege logits");
             }
-            let (best_idx, &best_prob) = probs_vec
+            let (best_idx, &best_prob) = probs
                 .iter()
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -332,32 +459,24 @@ mod classifier {
                 .get(best_idx)
                 .cloned()
                 .unwrap_or_else(|| format!("class_{best_idx}"));
+            let label_lower = label.to_ascii_lowercase();
             let is_background = self
                 .background_labels
                 .iter()
-                .any(|bg| bg == &label.to_ascii_lowercase());
+                .any(|bg| bg == &label_lower);
             let present = best_prob >= self.presence_threshold && !is_background;
-            let classification = if present {
-                Some(Classification {
-                    decision: Decision::Label(label),
-                    confidence: best_prob,
-                })
+            let decision = if present {
+                Decision::Label(label)
             } else {
-                Some(Classification {
-                    decision: Decision::Unknown,
-                    confidence: best_prob,
-                })
+                Decision::Unknown
             };
             Ok(ClassificationResult {
                 present,
-                classification,
+                classification: Some(Classification {
+                    decision,
+                    confidence: best_prob,
+                }),
             })
-        }
-
-        fn prepare_input(&self, path: &Path) -> Result<Tensor> {
-            let tensor =
-                load_image_tensor(path, self.input_size, self.mean, self.std, &self.device)?;
-            Ok(tensor.unsqueeze(0)?)
         }
     }
 
