@@ -465,10 +465,10 @@ mod classifier {
                 .iter()
                 .any(|bg| bg == &label_lower);
             let present = best_prob >= self.presence_threshold && !is_background;
-            let decision = if present {
-                Decision::Label(label)
-            } else {
+            let decision = if is_background {
                 Decision::Unknown
+            } else {
+                Decision::Label(label)
             };
             Ok(ClassificationResult {
                 present,
