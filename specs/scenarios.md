@@ -30,3 +30,9 @@ Given a completed scan with both present and empty frames
 When the user toggles between "Aanwezig" and "Leeg"
 Then each thumbnail shows the filename above, the predicted species + confidence below, and lazy-loads as needed
 And the user can select frames using click, Ctrl-click, Shift-range, or Ctrl-A for later context actions
+
+Scenario 5: Opt-in Roboflow upload
+Given the Instellingen panel is open
+And the user enables "Help de herkenning te verbeteren" and leaves the dataset name at "voederhuiscamera"
+When the user recategorizes one or more images via the context menu
+Then a background upload is triggered and the Roboflow dataset receives the images with the selected label without blocking the UI

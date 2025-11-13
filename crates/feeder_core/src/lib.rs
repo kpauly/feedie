@@ -367,8 +367,7 @@ mod classifier {
             let mut prepared: Vec<_> = inputs
                 .into_par_iter()
                 .map(|(idx, path)| {
-                    let data =
-                        load_image_tensor_data(&path, self.input_size, self.mean, self.std);
+                    let data = load_image_tensor_data(&path, self.input_size, self.mean, self.std);
                     (idx, path, data)
                 })
                 .collect();
@@ -384,10 +383,7 @@ mod classifier {
                             tensors.push(tensor);
                         }
                         Err(err) => {
-                            tracing::warn!(
-                                "Tensor bouwen mislukt voor {}: {err}",
-                                path.display()
-                            );
+                            tracing::warn!("Tensor bouwen mislukt voor {}: {err}", path.display());
                             if let Some(info) = chunk.get_mut(idx) {
                                 info.present = false;
                                 info.classification = None;
@@ -414,8 +410,7 @@ mod classifier {
             let probs = nn::ops::softmax(&logits, D::Minus1)?;
             let probs_rows = probs.to_vec2::<f32>()?;
 
-            for (row_probs, idx_in_chunk) in probs_rows.into_iter().zip(tensor_order.into_iter())
-            {
+            for (row_probs, idx_in_chunk) in probs_rows.into_iter().zip(tensor_order.into_iter()) {
                 if let Some(info) = chunk.get_mut(idx_in_chunk) {
                     match self.build_result_from_probs(&row_probs) {
                         Ok(result) => {
@@ -460,10 +455,7 @@ mod classifier {
                 .cloned()
                 .unwrap_or_else(|| format!("class_{best_idx}"));
             let label_lower = label.to_ascii_lowercase();
-            let is_background = self
-                .background_labels
-                .iter()
-                .any(|bg| bg == &label_lower);
+            let is_background = self.background_labels.iter().any(|bg| bg == &label_lower);
             let present = best_prob >= self.presence_threshold && !is_background;
             let decision = if is_background {
                 Decision::Unknown

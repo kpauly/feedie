@@ -55,6 +55,12 @@
   - [ ] Species picker (aliases)
   - [ ] Rebuild/compact user index
 
+## Feedback loop
+- [x] **F1. Roboflow opt-in uploader**
+  - [x] Instellingen checkbox “Help de herkenning te verbeteren” + dataset veld (prefilled met `voederhuiscamera`)
+  - [x] Achtergrondthread die manuele herlabelingen (single/multi select) uploadt zonder de UI te blokkeren
+  - [x] API-callketen (upload + annotate) gebruikt vaste sleutel en datasetnaam en logt succes/fouten, conform Scenario 5
+
 ## Reference packs
 - [ ] **R1. Starter pack loader**
   - [ ] Read `/reference/meta.json`; load `index.bin` + overlay `index_user.bin`
@@ -68,6 +74,8 @@
   - [ ] e2e test: mixed frames fixture → filter reduces count
 - [ ] **S3. Scenario 3: Unknown species abstention**
   - [ ] unit: threshold logic; e2e: out-of-gallery image → “Unknown”
+- [ ] **S5. Scenario 5: Opt-in Roboflow upload**
+  - [ ] e2e: toggle helpt de herkenning → recategorisatie triggert achtergrondupload en logging
 
 ## Packaging
 - [ ] **P1. Config & models**

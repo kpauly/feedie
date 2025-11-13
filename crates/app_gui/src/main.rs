@@ -86,6 +86,9 @@ struct UiApp {
     background_labels: Vec<String>,
     preview: Option<PreviewState>,
     label_options: Vec<LabelOption>,
+    // Settings: Roboflow
+    improve_recognition: bool,
+    roboflow_dataset_input: String,
 }
 
 impl Default for UiApp {
@@ -114,6 +117,8 @@ impl Default for UiApp {
             background_labels: vec!["achtergrond".to_string()],
             preview: None,
             label_options: Self::load_label_options(),
+            improve_recognition: false,
+            roboflow_dataset_input: "voederhuiscamera".to_string(),
         }
     }
 }
@@ -124,6 +129,7 @@ const MAX_FULL_IMAGES: usize = 32;
 const MAX_THUMB_LOAD_PER_FRAME: usize = 12;
 const CARD_WIDTH: f32 = THUMB_SIZE as f32 + 40.0;
 const CARD_HEIGHT: f32 = THUMB_SIZE as f32 + 70.0;
+const ROBOFLOW_API_KEY: &str = "g9zfZxZVNuSr43ENZJMg";
 
 enum ScanMsg {
     Progress(usize, usize),     // scanned, total
@@ -463,6 +469,24 @@ impl UiApp {
                 self.status = "Achtergrondlabels bijgewerkt voor huidige resultaten".to_string();
             }
         });
+
+        ui.add_space(12.0);
+        ui.separator();
+        ui.add_space(6.0);
+        ui.checkbox(
+            &mut self.improve_recognition,
+            "Help de herkenning te verbeteren",
+        );
+        ui.label(
+            "Wanneer je handmatig een categorie wijzigt, uploaden we die afbeeldingen op de achtergrond naar Roboflow.",
+        );
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            ui.label("Roboflow dataset (bijv. voederhuiscamera)");
+            ui.text_edit_singleline(&mut self.roboflow_dataset_input);
+        });
+        ui.add_space(4.0);
+        ui.label("Uploads gebruiken een ingebouwde Roboflow API-sleutel en draaien volledig op de achtergrond.");
     }
 
     fn render_folder_panel(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
@@ -476,20 +500,18 @@ impl UiApp {
         if ui
             .add_enabled(!self.scan_in_progress, egui::Button::new("Map kiezen..."))
             .clicked()
+            && let Some(dir) = FileDialog::new().set_directory(".").pick_folder()
         {
-            if let Some(dir) = FileDialog::new().set_directory(".").pick_folder() {
-                self.set_selected_folder(dir);
-            }
+            self.set_selected_folder(dir);
         }
         let can_scan = self.gekozen_map.is_some() && !self.scan_in_progress;
         if ui
             .add_enabled(can_scan, egui::Button::new("Scannen"))
             .clicked()
+            && let Some(dir) = self.gekozen_map.clone()
         {
-            if let Some(dir) = self.gekozen_map.clone() {
-                self.start_scan(dir);
-                self.panel = Panel::Results;
-            }
+            self.start_scan(dir);
+            self.panel = Panel::Results;
         }
         if self.scan_in_progress {
             ui.add_space(8.0);
@@ -866,11 +888,12 @@ impl UiApp {
     }
 
     fn classifier_config(&self) -> ClassifierConfig {
-        let mut cfg = ClassifierConfig::default();
-        cfg.presence_threshold = self.pending_presence_threshold;
-        cfg.batch_size = self.batch_size.max(1);
-        cfg.background_labels = self.background_labels.clone();
-        cfg
+        ClassifierConfig {
+            presence_threshold: self.pending_presence_threshold,
+            batch_size: self.batch_size.max(1),
+            background_labels: self.background_labels.clone(),
+            ..Default::default()
+        }
     }
 }
 
@@ -1052,15 +1075,15 @@ impl UiApp {
             }
         }
         for info in &self.rijen {
-            if let Some(classification) = &info.classification {
-                if let Decision::Label(name) = &classification.decision {
-                    let canonical = canonical_label(name);
-                    if canonical == "achtergrond" || canonical == "iets sp" {
-                        continue;
-                    }
-                    if seen.insert(canonical.clone()) {
-                        ordered.push(canonical);
-                    }
+            if let Some(classification) = &info.classification
+                && let Decision::Label(name) = &classification.decision
+            {
+                let canonical = canonical_label(name);
+                if canonical == "achtergrond" || canonical == "iets sp" {
+                    continue;
+                }
+                if seen.insert(canonical.clone()) {
+                    ordered.push(canonical);
                 }
             }
         }
@@ -1070,6 +1093,7 @@ impl UiApp {
     fn assign_manual_category(&mut self, indices: &[usize], label: String, mark_present: bool) {
         let lower = canonical_label(&label);
         let display = self.display_for(&lower);
+        let mut paths: Vec<PathBuf> = Vec::new();
         for &idx in indices {
             if let Some(info) = self.rijen.get_mut(idx) {
                 info.classification = Some(Classification {
@@ -1077,9 +1101,41 @@ impl UiApp {
                     confidence: 1.0,
                 });
                 info.present = mark_present && lower != "achtergrond";
+                paths.push(info.file.clone());
             }
         }
         self.status = format!("{} kaart(en) gemarkeerd als {}", indices.len(), display);
+
+        // Background upload to Roboflow if enabled and configured
+        if self.improve_recognition {
+            let dataset = self
+                .roboflow_dataset_input
+                .trim()
+                .trim_matches('/')
+                .to_string();
+            let label_for_upload = display.clone();
+            let api_key = ROBOFLOW_API_KEY.trim();
+            if api_key.is_empty() {
+                tracing::warn!("Roboflow upload staat aan, maar er is geen API-sleutel ingebouwd");
+            } else if !dataset.is_empty() && !paths.is_empty() {
+                // Spawn a background thread to upload the selected images
+                std::thread::spawn(move || {
+                    for path in paths {
+                        if let Err(e) =
+                            upload_to_roboflow(&path, &label_for_upload, &dataset, api_key)
+                        {
+                            tracing::warn!("Roboflow upload failed for {}: {}", path.display(), e);
+                        } else {
+                            tracing::info!("Roboflow upload succeeded for {}", path.display());
+                        }
+                    }
+                });
+            } else {
+                tracing::warn!(
+                    "Roboflow upload niet uitgevoerd: dataset ontbreekt of geen paden geselecteerd"
+                );
+            }
+        }
     }
 
     fn context_targets(&self, idx: usize) -> Vec<usize> {
@@ -1132,4 +1188,86 @@ fn fallback_display_label(name: &str) -> String {
         }
     }
     result
+}
+
+fn upload_to_roboflow(
+    path: &Path,
+    label: &str,
+    dataset: &str,
+    api_key: &str,
+) -> anyhow::Result<()> {
+    use anyhow::{Context, anyhow};
+    use reqwest::blocking::{Client, multipart};
+    use std::time::Duration;
+
+    let filename = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "image".to_string());
+
+    let dataset_slug = dataset.trim_matches('/');
+    if dataset_slug.is_empty() {
+        return Err(anyhow!("Roboflow datasetnaam ontbreekt"));
+    }
+    let dataset_slug_encoded = urlencoding::encode(dataset_slug);
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .context("HTTP client bouwen")?;
+
+    let upload_url = format!(
+        "https://api.roboflow.com/dataset/{}/upload?api_key={}&name={}&split=train",
+        dataset_slug_encoded,
+        api_key,
+        urlencoding::encode(&filename)
+    );
+
+    let form = multipart::Form::new()
+        .file("file", path)
+        .with_context(|| format!("Bestand toevoegen aan upload-formulier: {}", path.display()))?;
+
+    let response = client
+        .post(&upload_url)
+        .multipart(form)
+        .send()
+        .context("Roboflow-upload mislukt")?
+        .error_for_status()
+        .context("Roboflow-upload gaf een foutstatus")?;
+
+    let json: serde_json::Value = response
+        .json()
+        .context("Uploadantwoord kon niet gelezen worden")?;
+    let upload_id = json
+        .get("id")
+        .and_then(|id| id.as_str())
+        .or_else(|| {
+            json.get("image")
+                .and_then(|img| img.get("id"))
+                .and_then(|id| id.as_str())
+        })
+        .ok_or_else(|| anyhow!("Upload-ID ontbreekt in Roboflow-antwoord: {json}"))?;
+    tracing::info!("Roboflow-upload voltooid ({upload_id})");
+
+    // Attach a CSV classification annotation (filename,label) so Roboflow applies
+    // the selected label without inventing new categories.
+    let annotate_url = format!(
+        "https://api.roboflow.com/dataset/{}/annotate/{}?api_key={}&name={}",
+        dataset_slug_encoded,
+        urlencoding::encode(upload_id),
+        api_key,
+        urlencoding::encode("classification.csv")
+    );
+    let annotation_text = format!("{label}\n");
+
+    client
+        .post(&annotate_url)
+        .header("Content-Type", "text/plain")
+        .body(annotation_text)
+        .send()
+        .context("Roboflow-annotatie mislukt")?
+        .error_for_status()
+        .context("Roboflow-annotatie gaf een foutstatus")?;
+
+    Ok(())
 }
