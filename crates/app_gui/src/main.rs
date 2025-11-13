@@ -4,7 +4,7 @@ use feeder_core::{
     export_csv, scan_folder_with,
 };
 use rfd::FileDialog;
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
@@ -56,6 +56,12 @@ struct PreviewState {
     initialized: bool,
 }
 
+#[derive(Clone)]
+struct LabelOption {
+    canonical: String,
+    display: String,
+}
+
 struct UiApp {
     gekozen_map: Option<PathBuf>,
     rijen: Vec<ImageInfo>,
@@ -79,6 +85,7 @@ struct UiApp {
     background_labels_input: String,
     background_labels: Vec<String>,
     preview: Option<PreviewState>,
+    label_options: Vec<LabelOption>,
 }
 
 impl Default for UiApp {
@@ -106,6 +113,7 @@ impl Default for UiApp {
             background_labels_input: "Achtergrond".to_string(),
             background_labels: vec!["achtergrond".to_string()],
             preview: None,
+            label_options: Self::load_label_options(),
         }
     }
 }
@@ -985,6 +993,34 @@ impl App for UiApp {
 }
 
 impl UiApp {
+    fn load_label_options() -> Vec<LabelOption> {
+        let path = PathBuf::from("models/feeder-labels.csv");
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            tracing::warn!(
+                "Kon labels niet laden uit {}: bestand ontbreekt of is onleesbaar",
+                path.display()
+            );
+            return Vec::new();
+        };
+        let mut seen = HashSet::new();
+        let mut options = Vec::new();
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let canonical = canonical_label(trimmed);
+            if canonical.is_empty() || !seen.insert(canonical.clone()) {
+                continue;
+            }
+            options.push(LabelOption {
+                canonical,
+                display: trimmed.to_string(),
+            });
+        }
+        options
+    }
+
     fn render_context_menu(&mut self, ui: &mut egui::Ui, indices: &[usize]) {
         if ui.button("Markeer als Achtergrond (Leeg)").clicked() {
             self.assign_manual_category(indices, "achtergrond".into(), false);
@@ -995,11 +1031,8 @@ impl UiApp {
             ui.close();
         }
         ui.separator();
-        for label in self.available_labels().into_iter().filter(|label| {
-            let lower = label.to_ascii_lowercase();
-            lower != "achtergrond" && lower != "iets sp"
-        }) {
-            let display = display_label(&label);
+        for label in self.available_labels() {
+            let display = self.display_for(&label);
             if ui.button(display).clicked() {
                 self.assign_manual_category(indices, label, true);
                 ui.close();
@@ -1008,22 +1041,35 @@ impl UiApp {
     }
 
     fn available_labels(&self) -> Vec<String> {
-        let mut set: std::collections::BTreeSet<String> =
-            self.background_labels.clone().into_iter().collect();
-        set.insert("iets sp".into());
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut ordered = Vec::new();
+        for option in &self.label_options {
+            if option.canonical == "achtergrond" || option.canonical == "iets sp" {
+                continue;
+            }
+            if seen.insert(option.canonical.clone()) {
+                ordered.push(option.canonical.clone());
+            }
+        }
         for info in &self.rijen {
             if let Some(classification) = &info.classification {
                 if let Decision::Label(name) = &classification.decision {
-                    set.insert(canonical_label(name));
+                    let canonical = canonical_label(name);
+                    if canonical == "achtergrond" || canonical == "iets sp" {
+                        continue;
+                    }
+                    if seen.insert(canonical.clone()) {
+                        ordered.push(canonical);
+                    }
                 }
             }
         }
-        set.into_iter().collect()
+        ordered
     }
 
     fn assign_manual_category(&mut self, indices: &[usize], label: String, mark_present: bool) {
-        let lower = label.to_ascii_lowercase();
-        let display = display_label(&label);
+        let lower = canonical_label(&label);
+        let display = self.display_for(&lower);
         for &idx in indices {
             if let Some(info) = self.rijen.get_mut(idx) {
                 info.classification = Some(Classification {
@@ -1043,6 +1089,24 @@ impl UiApp {
             vec![idx]
         }
     }
+
+    fn display_for(&self, name: &str) -> String {
+        let canonical = canonical_label(name);
+        if canonical == "iets sp" {
+            return "Iets sp.".to_string();
+        }
+        if canonical == "achtergrond" {
+            return "Achtergrond".to_string();
+        }
+        if let Some(option) = self
+            .label_options
+            .iter()
+            .find(|option| option.canonical == canonical)
+        {
+            return option.display.clone();
+        }
+        fallback_display_label(&canonical)
+    }
 }
 
 fn canonical_label(name: &str) -> String {
@@ -1051,15 +1115,21 @@ fn canonical_label(name: &str) -> String {
     cleaned.to_ascii_lowercase()
 }
 
-fn display_label(name: &str) -> String {
-    match name {
-        "iets sp" => "Iets sp.".to_string(),
-        _ => {
-            let mut chars = name.chars();
-            match chars.next() {
-                Some(first) => format!("{}{}", first.to_uppercase(), chars.as_str()),
-                None => String::new(),
-            }
+fn fallback_display_label(name: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize = true;
+    for ch in name.chars() {
+        if ch.is_whitespace() {
+            capitalize = true;
+            result.push(ch);
+            continue;
+        }
+        if capitalize {
+            result.extend(ch.to_uppercase());
+            capitalize = false;
+        } else {
+            result.push(ch);
         }
     }
+    result
 }
