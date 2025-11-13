@@ -1064,13 +1064,14 @@ impl UiApp {
             }
         }
         ui.separator();
-        ui.menu_button("Nieuw... >", |ui| {
+        ui.menu_button("Nieuw...", |ui| {
             ui.label("Vul een nieuwe soortnaam in:");
             ui.horizontal(|ui| {
                 let resp = ui.add(
                     egui::TextEdit::singleline(&mut self.new_label_buffer)
                         .hint_text("Nieuwe soort"),
                 );
+                resp.request_focus();
                 let mut submit = false;
                 if resp.lost_focus()
                     && ui.input(|i| i.key_pressed(egui::Key::Enter))
