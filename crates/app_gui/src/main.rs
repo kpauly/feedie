@@ -392,18 +392,17 @@ impl UiApp {
         }
     }
 
-    fn thumbnail_caption(info: &ImageInfo) -> String {
+    fn thumbnail_caption(&self, info: &ImageInfo) -> String {
         match &info.classification {
             Some(classification) => {
-                let label = match &classification.decision {
-                    Decision::Label(name) => {
-                        if let Some(stripped) = name.strip_suffix(" (manueel)") {
-                            return format!("{stripped} (manueel)");
-                        }
-                        name.clone()
-                    }
+                let mut label = match &classification.decision {
+                    Decision::Label(name) => self.display_for(name),
                     Decision::Unknown => "Leeg".to_string(),
                 };
+                if matches!(&classification.decision, Decision::Label(name) if name.ends_with(" (manueel)"))
+                {
+                    label.push_str(" (manueel)");
+                }
                 format!("{label} ({:.1}%)", classification.confidence * 100.0)
             }
             None => "Geen classificatie".to_string(),
@@ -425,7 +424,7 @@ impl UiApp {
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| info.file.to_string_lossy().to_string());
-            let caption = Self::thumbnail_caption(info);
+            let caption = self.thumbnail_caption(info);
             (info.file.clone(), label, caption)
         };
 
@@ -1750,7 +1749,13 @@ impl UiApp {
 
 fn canonical_label(name: &str) -> String {
     let stripped = name.strip_suffix(" (manueel)").unwrap_or(name).trim();
-    let cleaned = stripped.trim_end_matches('.');
+    let primary = stripped
+        .split_once(',')
+        .map(|(first, _)| first.trim())
+        .unwrap_or(stripped);
+    let cleaned = primary
+        .trim_end_matches(|c: char| c == '.' || c == ',')
+        .trim();
     cleaned.to_ascii_lowercase()
 }
 

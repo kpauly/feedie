@@ -294,9 +294,17 @@ mod classifier {
                 fs::read_to_string(&cfg.labels_path).context("labels niet te lezen")?;
             let mut labels: Vec<String> = labels_raw
                 .lines()
-                .map(|l| l.trim())
+                .map(|line| {
+                    let trimmed = line.trim();
+                    let primary = trimmed
+                        .split_once(',')
+                        .map(|(first, _)| first.trim())
+                        .unwrap_or(trimmed)
+                        .trim_end_matches(',')
+                        .trim();
+                    primary.to_string()
+                })
                 .filter(|l| !l.is_empty())
-                .map(|l| l.to_string())
                 .collect();
             if labels.is_empty() {
                 anyhow::bail!("labels-bestand bevat geen labels");
