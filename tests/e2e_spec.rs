@@ -29,3 +29,36 @@ fn e2e_scenario_3_unknown_species_abstention() {
     // And confidence is below the threshold
     todo!("Implement Scenario 3 E2E");
 }
+
+#[test]
+#[ignore = "E2E not implemented; see specs/scenarios.md"]
+fn e2e_scenario_4_thumbnail_review_and_selection() {
+    // Scenario 4: Thumbnail review & selection
+    // Given a completed scan with both present and empty frames
+    // When the user toggles between "Aanwezig" and "Leeg"
+    // Then each thumbnail shows the filename above, the predicted species + confidence below, and lazy-loads as needed
+    // And the user can select frames using click, Ctrl-click, Shift-range, or Ctrl-A for later context actions
+    todo!("Implement Scenario 4 E2E");
+}
+
+#[test]
+#[ignore = "E2E not implemented; see specs/scenarios.md"]
+fn e2e_scenario_5_opt_in_roboflow_upload() {
+    // Scenario 5: Opt-in Roboflow upload
+    // Given the Instellingen panel is open
+    // And the user enables "Help de herkenning te verbeteren" and leaves the dataset name at "voederhuiscamera"
+    // When the user recategorizes one or more images via the context menu
+    // Then a background upload is triggered and the Roboflow dataset receives the images with the selected label without blocking the UI
+    todo!("Implement Scenario 5 E2E");
+}
+
+#[test]
+#[ignore = "E2E not implemented; see specs/scenarios.md"]
+fn e2e_scenario_6_create_new_category_via_nieuw() {
+    // Scenario 6: Create a new category via "Nieuw..."
+    // Given the user opens the context menu on one or more selected thumbnails
+    // And the menu shows the "Nieuw... >" entry
+    // When the user types a new label name, presses Enter (or clicks OK), and the upload toggle is enabled
+    // Then the frames immediately get the manual label, move to the Aanwezig tab, and the image+label is uploaded to Roboflow in the background
+    todo!("Implement Scenario 6 E2E");
+}
