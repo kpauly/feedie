@@ -1,9 +1,10 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+use chrono::{DateTime, Local};
 use eframe::{App, Frame, NativeOptions, egui};
 use feeder_core::{
     Classification, ClassifierConfig, Decision, EfficientVitClassifier, ImageInfo, ScanOptions,
-    export_csv, scan_folder_with,
+    scan_folder_with,
 };
 use rfd::FileDialog;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
@@ -40,6 +41,7 @@ enum ViewMode {
 enum Panel {
     Folder,
     Results,
+    Export,
     Settings,
 }
 
@@ -64,6 +66,46 @@ struct PreviewState {
 struct LabelOption {
     canonical: String,
     display: String,
+    scientific: Option<String>,
+}
+
+#[derive(Clone)]
+struct ExportOptions {
+    include_present: bool,
+    include_uncertain: bool,
+    include_background: bool,
+    include_csv: bool,
+}
+
+struct PendingExport {
+    target_dir: PathBuf,
+    options: ExportOptions,
+}
+
+struct ExportOutcome {
+    copied: usize,
+    wrote_csv: bool,
+    target_dir: PathBuf,
+}
+
+struct ExportJob {
+    source: PathBuf,
+    folder_label: String,
+    canonical_label: Option<String>,
+    include_in_csv: bool,
+}
+
+struct CsvRecord {
+    date: String,
+    time: String,
+    scientific: String,
+    path: String,
+}
+
+#[derive(Default)]
+struct CoordinatePrompt {
+    input: String,
+    error: Option<String>,
 }
 
 struct UiApp {
@@ -91,6 +133,12 @@ struct UiApp {
     preview: Option<PreviewState>,
     label_options: Vec<LabelOption>,
     new_label_buffer: String,
+    export_present: bool,
+    export_uncertain: bool,
+    export_background: bool,
+    export_csv: bool,
+    pending_export: Option<PendingExport>,
+    coordinate_prompt: Option<CoordinatePrompt>,
     // Settings: Roboflow
     improve_recognition: bool,
     roboflow_dataset_input: String,
@@ -126,6 +174,12 @@ impl Default for UiApp {
             preview: None,
             label_options: Self::load_label_options(),
             new_label_buffer: String::new(),
+            export_present: true,
+            export_uncertain: false,
+            export_background: false,
+            export_csv: true,
+            pending_export: None,
+            coordinate_prompt: None,
             improve_recognition: false,
             roboflow_dataset_input: "voederhuiscamera".to_string(),
             upload_status_tx,
@@ -978,21 +1032,16 @@ impl App for UiApp {
                 {
                     self.panel = Panel::Results;
                 }
-                let can_export =
+                let can_view_export =
                     self.has_scanned && !self.rijen.is_empty() && !self.scan_in_progress;
                 if ui
-                    .add_enabled(can_export, egui::Button::new("Exporteren"))
+                    .add_enabled(
+                        can_view_export,
+                        egui::Button::new("Exporteren").selected(self.panel == Panel::Export),
+                    )
                     .clicked()
-                    && let Some(path) = FileDialog::new()
-                        .add_filter("CSV", &["csv"])
-                        .set_file_name("feeder_vision.csv")
-                        .save_file()
                 {
-                    if let Err(e) = export_csv(&self.rijen, &path) {
-                        self.status = format!("Fout bij exporteren: {e}");
-                    } else {
-                        self.status = format!("CSV opgeslagen: {}", path.display());
-                    }
+                    self.panel = Panel::Export;
                 }
                 if ui
                     .add(egui::Button::new("Instellingen").selected(self.panel == Panel::Settings))
@@ -1005,10 +1054,12 @@ impl App for UiApp {
         egui::CentralPanel::default().show(ctx, |ui| match self.panel {
             Panel::Folder => self.render_folder_panel(ui, ctx),
             Panel::Results => self.render_results_panel(ui, ctx),
+            Panel::Export => self.render_export_panel(ui),
             Panel::Settings => self.render_settings_panel(ui),
         });
 
         self.render_preview_window(ctx);
+        self.render_coordinate_prompt(ctx);
 
         let status_display = if self.status.is_empty() {
             if self.scan_in_progress {
@@ -1046,13 +1097,25 @@ impl UiApp {
             if trimmed.is_empty() {
                 continue;
             }
-            let canonical = canonical_label(trimmed);
+            let (display, scientific_raw) = match trimmed.split_once(',') {
+                Some((name, sci)) => (name.trim(), sci.trim()),
+                None => (trimmed, ""),
+            };
+            if display.is_empty() {
+                continue;
+            }
+            let canonical = canonical_label(display);
             if canonical.is_empty() || !seen.insert(canonical.clone()) {
                 continue;
             }
             options.push(LabelOption {
                 canonical,
-                display: trimmed.to_string(),
+                display: display.to_string(),
+                scientific: if scientific_raw.is_empty() {
+                    None
+                } else {
+                    Some(scientific_raw.to_string())
+                },
             });
         }
         options
@@ -1104,6 +1167,205 @@ impl UiApp {
                 }
             });
         });
+    }
+
+    fn render_export_panel(&mut self, ui: &mut egui::Ui) {
+        if !self.has_scanned || self.rijen.is_empty() {
+            ui.label("Er zijn nog geen scanresultaten om te exporteren.");
+            return;
+        }
+
+        ui.heading("Opties");
+        ui.add_space(4.0);
+        ui.checkbox(
+            &mut self.export_present,
+            "Exporteer foto's met aanwezige soorten",
+        );
+        ui.checkbox(
+            &mut self.export_uncertain,
+            "Exporteer foto's met onzekere identificatie",
+        );
+        ui.checkbox(
+            &mut self.export_background,
+            "Exporteer foto's met enkel achtergrond",
+        );
+        let csv_checkbox = ui.checkbox(
+            &mut self.export_csv,
+            "Exporteer identificatieresultaten als CSV bestand",
+        );
+        if csv_checkbox.clicked() && self.export_csv {
+            self.export_present = true;
+        }
+
+        ui.add_space(12.0);
+        let can_export = self.can_export_from_panel();
+        let button = ui.add_enabled(can_export, egui::Button::new("Exporteer"));
+        if button.clicked() {
+            self.start_export_workflow();
+        }
+        if !can_export {
+            ui.label("Selecteer minstens één categorie om te exporteren.");
+        }
+    }
+
+    fn can_export_from_panel(&self) -> bool {
+        self.has_scanned
+            && !self.rijen.is_empty()
+            && (self.export_present || self.export_uncertain || self.export_background)
+    }
+
+    fn start_export_workflow(&mut self) {
+        if !self.can_export_from_panel() {
+            self.status = "Geen foto's om te exporteren.".to_string();
+            return;
+        }
+        if self.export_csv && !self.export_present {
+            self.status =
+                "CSV export vereist dat 'aanwezige soorten' wordt meegekopieerd.".to_string();
+            return;
+        }
+
+        let mut dialog = FileDialog::new();
+        if let Some(dir) = &self.gekozen_map {
+            dialog = dialog.set_directory(dir);
+        }
+        let Some(target_dir) = dialog.pick_folder() else {
+            self.status = "Export geannuleerd.".to_string();
+            return;
+        };
+
+        let options = ExportOptions {
+            include_present: self.export_present,
+            include_uncertain: self.export_uncertain,
+            include_background: self.export_background,
+            include_csv: self.export_csv,
+        };
+        let pending = PendingExport {
+            target_dir,
+            options,
+        };
+
+        if pending.options.include_csv {
+            self.pending_export = Some(pending);
+            self.coordinate_prompt = Some(CoordinatePrompt::default());
+        } else {
+            let result = self.perform_export(pending, None);
+            self.handle_export_result(result);
+        }
+    }
+
+    fn handle_export_result(&mut self, result: anyhow::Result<ExportOutcome>) {
+        match result {
+            Ok(summary) => {
+                let mut message = if summary.copied == 0 {
+                    format!(
+                        "Geen bestanden geëxporteerd in {}",
+                        summary.target_dir.display()
+                    )
+                } else {
+                    format!(
+                        "{} foto('s) geëxporteerd naar {}",
+                        summary.copied,
+                        summary.target_dir.display()
+                    )
+                };
+                if summary.wrote_csv {
+                    message.push_str("; CSV opgeslagen.");
+                }
+                self.status = message;
+            }
+            Err(err) => {
+                self.status = format!("Exporteren mislukt: {err}");
+            }
+        }
+    }
+
+    fn complete_pending_export(&mut self, coords: (f64, f64)) {
+        if let Some(pending) = self.pending_export.take() {
+            let result = self.perform_export(pending, Some(coords));
+            self.handle_export_result(result);
+        }
+        self.coordinate_prompt = None;
+    }
+
+    fn render_coordinate_prompt(&mut self, ctx: &egui::Context) {
+        if self.coordinate_prompt.is_none() {
+            return;
+        }
+        ctx.request_repaint();
+
+        let mut close_requested = false;
+        let mut submit_coords: Option<(f64, f64)> = None;
+
+        {
+            let prompt = self.coordinate_prompt.as_mut().unwrap();
+            let mut open = true;
+            egui::Window::new("Coördinaten voor CSV")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .open(&mut open)
+                .show(ctx, |ui| {
+                    ui.label("Plak hier de Google Maps coördinaten:");
+                    let response = ui.add(
+                        egui::TextEdit::singleline(&mut prompt.input)
+                            .desired_width(260.0)
+                            .hint_text("51.376318769269716, 4.456974517090091"),
+                    );
+
+                    ui.add_space(6.0);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label("Tip: open ");
+                        ui.hyperlink_to("Google Maps", "https://maps.google.com");
+                        ui.label(
+                            " en klik met de rechtermuisknop op de plaats van de camera. Klik vervolgens op de coördinaten bovenaan het verschenen keuzemenu. Deze worden automatisch naar het klembord gekopieerd. Klik opnieuw met de rechtermuisknop in het veld hierboven en kies plakken.",
+                        );
+                    });
+
+                    if let Some(err) = &prompt.error {
+                        ui.add_space(4.0);
+                        ui.colored_label(egui::Color32::RED, err);
+                    }
+
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        if ui.button("Annuleer").clicked() {
+                            close_requested = true;
+                        }
+                        let mut submit = false;
+                        if ui.button("Opslaan").clicked() {
+                            submit = true;
+                        }
+                        if response.lost_focus()
+                            && ui.input(|i| i.key_pressed(egui::Key::Enter))
+                        {
+                            submit = true;
+                        }
+                        if submit {
+                            match parse_coordinates(&prompt.input) {
+                                Ok(coords) => {
+                                    submit_coords = Some(coords);
+                                }
+                                Err(err) => {
+                                    prompt.error = Some(err.to_string());
+                                }
+                            }
+                        }
+                    });
+                });
+
+            if !open {
+                close_requested = true;
+            }
+        }
+
+        if let Some(coords) = submit_coords {
+            self.complete_pending_export(coords);
+        } else if close_requested {
+            self.pending_export = None;
+            self.coordinate_prompt = None;
+            self.status = "Export geannuleerd.".to_string();
+        }
     }
 
     fn export_selected_images(&mut self, indices: &[usize]) {
@@ -1223,6 +1485,154 @@ impl UiApp {
         ordered
     }
 
+    fn perform_export(
+        &self,
+        pending: PendingExport,
+        coords: Option<(f64, f64)>,
+    ) -> anyhow::Result<ExportOutcome> {
+        use anyhow::{Context, anyhow};
+
+        let PendingExport {
+            target_dir,
+            options,
+        } = pending;
+        let jobs = self.collect_export_jobs(&options);
+        if jobs.is_empty() && !options.include_csv {
+            return Err(anyhow!("Geen bestanden voldeden aan de huidige selectie."));
+        }
+
+        let mut copied = 0usize;
+        let mut csv_records: Vec<CsvRecord> = Vec::new();
+
+        for job in jobs {
+            let folder_name = sanitize_for_path(&job.folder_label);
+            if folder_name.is_empty() {
+                continue;
+            }
+            let folder_path = target_dir.join(&folder_name);
+            fs::create_dir_all(&folder_path)
+                .with_context(|| format!("Kon map {} niet aanmaken", folder_path.display()))?;
+
+            let stem = job
+                .source
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("image");
+            let sanitized_stem = sanitize_for_path(stem);
+            let base = if sanitized_stem.is_empty() {
+                folder_name.clone()
+            } else {
+                format!("{folder_name}_{sanitized_stem}")
+            };
+            let dest_path = next_available_export_path(&folder_path, &base, "jpg");
+            fs::copy(&job.source, &dest_path).with_context(|| {
+                format!(
+                    "Kopiëren van {} naar {} mislukt",
+                    job.source.display(),
+                    dest_path.display()
+                )
+            })?;
+
+            if job.include_in_csv {
+                coords.ok_or_else(|| anyhow!("Coördinaten ontbreken voor CSV-export"))?;
+                let (date, time) = extract_timestamp(&job.source)?;
+                let canonical = job
+                    .canonical_label
+                    .clone()
+                    .unwrap_or_else(|| canonical_label(&job.folder_label));
+                let scientific = self
+                    .scientific_for(&canonical)
+                    .unwrap_or_else(|| job.folder_label.clone());
+                csv_records.push(CsvRecord {
+                    date,
+                    time,
+                    scientific,
+                    path: dest_path.to_string_lossy().into_owned(),
+                });
+                // coords reused later when writing file
+            }
+
+            copied += 1;
+        }
+
+        if options.include_csv {
+            let coords = coords.ok_or_else(|| anyhow!("Coördinaten ontbreken voor CSV-export"))?;
+            write_export_csv(&target_dir, &csv_records, coords)?;
+        }
+
+        Ok(ExportOutcome {
+            copied,
+            wrote_csv: options.include_csv,
+            target_dir,
+        })
+    }
+
+    fn collect_export_jobs(&self, options: &ExportOptions) -> Vec<ExportJob> {
+        let mut jobs = Vec::new();
+        for info in &self.rijen {
+            if options.include_present && info.present {
+                if let Some((display, canonical)) = self.present_label(info) {
+                    jobs.push(ExportJob {
+                        source: info.file.clone(),
+                        folder_label: display,
+                        canonical_label: Some(canonical),
+                        include_in_csv: options.include_csv,
+                    });
+                }
+            }
+            if options.include_uncertain && self.is_onzeker(info) {
+                jobs.push(ExportJob {
+                    source: info.file.clone(),
+                    folder_label: "Onzeker".to_string(),
+                    canonical_label: None,
+                    include_in_csv: false,
+                });
+            }
+            if options.include_background && self.is_background_only(info) {
+                jobs.push(ExportJob {
+                    source: info.file.clone(),
+                    folder_label: "Achtergrond".to_string(),
+                    canonical_label: None,
+                    include_in_csv: false,
+                });
+            }
+        }
+        jobs
+    }
+
+    fn present_label(&self, info: &ImageInfo) -> Option<(String, String)> {
+        let classification = info.classification.as_ref()?;
+        if let Decision::Label(name) = &classification.decision {
+            let canonical = canonical_label(name);
+            if self.is_background_label(&canonical) {
+                return None;
+            }
+            let display = self.display_for(&canonical);
+            return Some((display, canonical));
+        }
+        None
+    }
+
+    fn is_background_only(&self, info: &ImageInfo) -> bool {
+        let Some(classification) = &info.classification else {
+            return false;
+        };
+        match &classification.decision {
+            Decision::Label(name) => {
+                let canonical = canonical_label(name);
+                self.is_background_label(&canonical)
+            }
+            Decision::Unknown => false,
+        }
+    }
+
+    fn scientific_for(&self, canonical: &str) -> Option<String> {
+        self.label_options
+            .iter()
+            .find(|option| option.canonical == canonical)
+            .and_then(|option| option.scientific.clone())
+    }
+
     fn assign_manual_category(&mut self, indices: &[usize], label: String, mark_present: bool) {
         let lower = canonical_label(&label);
         let display = self.display_for(&lower);
@@ -1303,6 +1713,7 @@ impl UiApp {
             self.label_options.push(LabelOption {
                 canonical: canonical.clone(),
                 display: new_label.clone(),
+                scientific: None,
             });
         }
         self.assign_manual_category(indices, new_label, true);
@@ -1388,6 +1799,66 @@ fn next_available_export_path(base_dir: &Path, base: &str, ext: &str) -> PathBuf
         }
         attempt += 1;
     }
+}
+
+fn extract_timestamp(path: &Path) -> anyhow::Result<(String, String)> {
+    use anyhow::Context;
+
+    let metadata = fs::metadata(path)
+        .with_context(|| format!("Kon metadata niet lezen voor {}", path.display()))?;
+    let system_time = metadata
+        .created()
+        .or_else(|_| metadata.modified())
+        .with_context(|| format!("Geen tijdstempel beschikbaar voor {}", path.display()))?;
+    let datetime: DateTime<Local> = system_time.into();
+    let date = datetime.format("%Y-%m-%d").to_string();
+    let time = datetime.format("%H:%M:%S").to_string();
+    Ok((date, time))
+}
+
+fn write_export_csv(
+    dir: &Path,
+    records: &[CsvRecord],
+    coords: (f64, f64),
+) -> anyhow::Result<PathBuf> {
+    use anyhow::Context;
+
+    let csv_path = dir.join("feeder_vision.csv");
+    let mut writer = csv::Writer::from_path(&csv_path)
+        .with_context(|| format!("Kon CSV-bestand {} niet openen", csv_path.display()))?;
+    writer.write_record(["date", "time", "scientific name", "lat", "lng", "path"])?;
+    let lat_str = format!("{}", coords.0);
+    let lng_str = format!("{}", coords.1);
+    for record in records {
+        writer.write_record([
+            record.date.as_str(),
+            record.time.as_str(),
+            record.scientific.as_str(),
+            lat_str.as_str(),
+            lng_str.as_str(),
+            record.path.as_str(),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(csv_path)
+}
+
+fn parse_coordinates(input: &str) -> anyhow::Result<(f64, f64)> {
+    use anyhow::{Context, anyhow};
+
+    let trimmed = input.trim();
+    let (lat_str, lng_str) = trimmed
+        .split_once(',')
+        .ok_or_else(|| anyhow!("Gebruik het formaat '<lat>, <lng>'."))?;
+    let lat = lat_str
+        .trim()
+        .parse::<f64>()
+        .with_context(|| "Latitude kon niet gelezen worden")?;
+    let lng = lng_str
+        .trim()
+        .parse::<f64>()
+        .with_context(|| "Longitude kon niet gelezen worden")?;
+    Ok((lat, lng))
 }
 
 fn upload_to_roboflow(

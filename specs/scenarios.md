@@ -49,3 +49,11 @@ And the context menu is opened on the selection
 When the user clicks "Exporteren", picks (or creates) a destination folder, and confirms "Opslaan"
 Then the app creates subfolders named after each category label under the chosen folder
 And it copies every selected image into the matching subfolder with filename `<label>_<originalfilename>.jpg`
+
+Scenario 8: Configure batch export via Exporteren tab
+Given the user has completed a scan and opens the Exporteren tab
+And "Exporteer foto's met aanwezige soorten" and "Exporteer identificatieresultaten als CSV bestand" are checked (others optional)
+When the user clicks "Exporteer", chooses a destination folder, and pastes the Google Maps coordinates in the prompt
+Then the app creates subfolders per geselecteerde optie (per soort, "Onzeker", "Achtergrond")
+And copies the relevant images as `<label>_<originalfilename>.jpg` into each subfolder
+And writes `feeder_vision.csv` in the exportroot met kolommen `date,time,scientific name,lat,lng,path` ingevuld met de ingevoerde coördinaten en de nieuwe bestandslocaties

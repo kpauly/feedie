@@ -74,3 +74,14 @@ fn e2e_scenario_7_export_selected_thumbnails() {
     // And it copies every selected image into the matching subfolder with filename `<label>_<originalfilename>.jpg`
     todo!("Implement Scenario 7 E2E");
 }
+
+#[test]
+#[ignore = "E2E not implemented; see specs/scenarios.md"]
+fn e2e_scenario_8_export_tab_batch_options() {
+    // Scenario 8: Configure batch export via Exporteren tab
+    // Given the user has completed a scan and opens the Exporteren tab
+    // And "Exporteer foto's met aanwezige soorten" and "Exporteer identificatieresultaten als CSV bestand" are checked (others optional)
+    // When the user clicks "Exporteer", chooses a destination folder, and pastes the Google Maps coordinates in the prompt
+    // Then the app creates the requested subfolders, copies the matching images, and writes feeder_vision.csv with date,time,scientific name,lat,lng,path
+    todo!("Implement Scenario 8 E2E");
+}

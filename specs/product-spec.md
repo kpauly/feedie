@@ -15,6 +15,7 @@ Users point to a feeder camera SD card dump folder with thousands of frames; the
 - CSV export: `file,present,species,confidence`.
 - File reorganization: retain only files with animal presence, sort into species folders.
 - Snelle contextmenu-export: "Exporteren" bovenaan elke selectie laat je een doelmap kiezen, maakt submappen per soort aan en kopieert de geselecteerde beelden als `<soort>_<originele bestandsnaam>.jpg`.
+- Exporttab: aparte "Exporteren"-paneel met checkboxen voor aanwezige/onzekere/achtergrondfoto's en CSV-export; batch export creëert submappen en kan tegelijk een CSV met datum, tijd, wetenschappelijke naam, coördinaten en pad genereren.
 - Reference pack updater (check for updates, manual import).
 - EfficientViT model package: `.safetensors` weights + `labels.csv` shipped with the installer; updated models + training notebook live in `/models`.
 - Roboflow feedback toggle: built-in API key + dataset field, with a background uploader that pushes every manual re-labelling (single or multi select) to dataset `voederhuiscamera`.
@@ -33,6 +34,7 @@ Users point to a feeder camera SD card dump folder with thousands of frames; the
 - Thumbnails worden lui (on-demand) geladen met een per-frame limiet om de UI vloeiend te houden bij grote aantallen. Elke kaart toont bestandsnaam + soort + vertrouwen en ondersteunt Windows-achtige selectie (klik, Ctrl/Cmd-klik, Shift-bereik, Ctrl-A) voor contextacties.
 - Instellingen bevat sliders voor onzekerheidsdrempel, batchgrootte, achtergrondlabels en de nieuwe sectie "Help de herkenning te verbeteren", inclusief datasetveld en uitleg dat uploads volledig op de achtergrond plaatsvinden zodra de checkbox aan staat.
 - Het contextmenu onder thumbnails toont eerst quick actions (achtergrond, onzeker), daarna "Exporteren ›" (opent een mapkiezer en kopieert de selectie per soortmap), vervolgens de bestaande soorten en sluit af met “Nieuw… >” waar de gebruiker een eigen label kan invullen; na bevestiging verschuift de kaart automatisch naar Aanwezig en, indien van toepassing, triggert een Roboflow-upload.
+- Het tabblad **Exporteren** biedt dezelfde look & feel als Fotomap/Scanresultaat en toont vier opties (aanwezige soorten, onzekere identificatie, achtergrond, CSV). Bij een klik op “Exporteer” kiest de gebruiker een doelmap, waarna de app submappen per soort/onzeker/achtergrond maakt en – indien CSV aan staat – om Google Maps-coördinaten vraagt om vervolgens een `feeder_vision.csv` met datum, tijd, wetenschappelijke naam, lat/lng en pad naar elke geëxporteerde foto te schrijven.
 
 ## Non-goals v0
 - Training, cloud inference, mobile, multi-user sync.

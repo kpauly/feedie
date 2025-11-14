@@ -54,6 +54,12 @@
   - [x] Bovenste "Exporteren"-optie in thumbnail-contextmenu met standaard submenupijl
   - [x] Folder picker + submap per soort en bestandsnaam `<label>_<origineel>.jpg`
   - [ ] (Follow-up) Exportprogressie + waarschuwing bij ontbrekende labels
+- [x] **G5. Exporteren tab**
+  - [x] Paneel met checkboxen voor aanwezige/onzekere/achtergrondfoto's en CSV-export
+  - [x] Exportknop opent mapkiezer en (voor CSV) coördinatenprompt
+  - [x] Submappen per gekozen categorie + batch-copy met `<label>_<origineel>.jpg`
+  - [x] CSV (`feeder_vision.csv`) met `date,time,scientific name,lat,lng,path` gevuld via labels.csv en ingevoerde coördinaten
+  - [ ] (Follow-up) Voortgang/rapportage tijdens batch export
 - [ ] **G3. Reference manager**
   - [ ] Add to reference → embedding → user index
   - [ ] Species picker (aliases)
@@ -83,6 +89,8 @@
   - [ ] e2e: toggle helpt de herkenning → recategorisatie triggert achtergrondupload en logging
 - [ ] **S7. Scenario 7: Export selected thumbnails**
   - [ ] e2e: multi-select → contextmenu Exporteren → bestanden belanden in soortmappen met juiste naamgeving
+- [ ] **S8. Scenario 8: Exporteren tab batch export**
+  - [ ] e2e: opties aanvinken → map kiezen → coördinaten invullen → submappen + CSV gemaakt
 
 ## Packaging
 - [ ] **P1. Config & models**
