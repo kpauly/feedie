@@ -674,23 +674,20 @@ impl UiApp {
             ManifestStatus::Ready(summary) => {
                 let summary = summary.clone();
                 if summary.app_update_available {
-                    ui.colored_label(
-                        egui::Color32::YELLOW,
-                        format!("Nieuwe app-versie beschikbaar: {}", summary.latest_app),
-                    );
+                    ui.label(format!(
+                        "Nieuwe app-versie beschikbaar: {}",
+                        summary.latest_app
+                    ));
                     ui.hyperlink_to("Open downloadpagina", &summary.app_url);
                 } else {
                     ui.label("Je gebruikt de nieuwste app-versie.");
                 }
                 ui.add_space(4.0);
                 if summary.model_update_available {
-                    ui.colored_label(
-                        egui::Color32::YELLOW,
-                        format!(
-                            "Nieuw herkenningsmodel beschikbaar: {}",
-                            summary.latest_model
-                        ),
-                    );
+                    ui.label(format!(
+                        "Nieuw herkenningsmodel beschikbaar: {}",
+                        summary.latest_model
+                    ));
                     if let Some(size) = summary.model_size_mb {
                         ui.label(format!("Geschatte downloadgrootte: {:.1} MB", size));
                     }
@@ -728,7 +725,7 @@ impl UiApp {
                 }
             }
             ModelDownloadStatus::Success(msg) => {
-                ui.colored_label(egui::Color32::GREEN, msg);
+                ui.label(msg);
                 if ui.button("Download opnieuw").clicked() {
                     self.start_model_download(summary);
                 }
@@ -739,10 +736,10 @@ impl UiApp {
     fn render_model_download_feedback(&self, ui: &mut egui::Ui) {
         match &self.model_download_status {
             ModelDownloadStatus::Success(msg) => {
-                ui.colored_label(egui::Color32::GREEN, msg);
+                ui.label(msg);
             }
             ModelDownloadStatus::Error(err) => {
-                ui.colored_label(egui::Color32::RED, err);
+                ui.label(err);
             }
             _ => {}
         }
