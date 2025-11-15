@@ -1,5 +1,6 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+use anyhow::Context;
 use arboard::Clipboard;
 use chrono::{DateTime, Local};
 use eframe::{App, Frame, NativeOptions, egui};
@@ -9,11 +10,13 @@ use feeder_core::{
     scan_folder_with,
 };
 use rfd::FileDialog;
+use semver::Version;
+use serde::Deserialize;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -114,6 +117,32 @@ struct CoordinatePrompt {
     error: Option<String>,
 }
 
+#[derive(Clone, Default)]
+struct UpdateSummary {
+    latest_app: String,
+    app_url: String,
+    latest_model: String,
+    model_url: String,
+    app_update_available: bool,
+    model_update_available: bool,
+    model_size_mb: Option<f32>,
+    model_notes: Option<String>,
+}
+
+#[derive(Clone)]
+enum ManifestStatus {
+    Idle,
+    Checking,
+    Ready(UpdateSummary),
+    Error(String),
+}
+
+impl Default for ManifestStatus {
+    fn default() -> Self {
+        ManifestStatus::Idle
+    }
+}
+
 struct UiApp {
     gekozen_map: Option<PathBuf>,
     rijen: Vec<ImageInfo>,
@@ -145,6 +174,10 @@ struct UiApp {
     export_csv: bool,
     pending_export: Option<PendingExport>,
     coordinate_prompt: Option<CoordinatePrompt>,
+    manifest_status: ManifestStatus,
+    update_rx: Option<Receiver<Result<RemoteManifest, String>>>,
+    app_version: String,
+    model_version: String,
     // Settings: Roboflow
     improve_recognition: bool,
     roboflow_dataset_input: String,
@@ -152,8 +185,14 @@ struct UiApp {
     upload_status_rx: Receiver<String>,
 }
 
-impl Default for UiApp {
-    fn default() -> Self {
+impl UiApp {
+    fn new() -> Self {
+        let mut app = Self::default_internal();
+        app.request_manifest_refresh();
+        app
+    }
+
+    fn default_internal() -> Self {
         let (upload_status_tx, upload_status_rx) = mpsc::channel();
         Self {
             gekozen_map: None,
@@ -186,11 +225,21 @@ impl Default for UiApp {
             export_csv: true,
             pending_export: None,
             coordinate_prompt: None,
+            manifest_status: ManifestStatus::Idle,
+            update_rx: None,
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
+            model_version: Self::load_model_version(),
             improve_recognition: false,
             roboflow_dataset_input: "voederhuiscamera".to_string(),
             upload_status_tx,
             upload_status_rx,
         }
+    }
+}
+
+impl Default for UiApp {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -201,6 +250,9 @@ const MAX_THUMB_LOAD_PER_FRAME: usize = 12;
 const CARD_WIDTH: f32 = THUMB_SIZE as f32 + 40.0;
 const CARD_HEIGHT: f32 = THUMB_SIZE as f32 + 70.0;
 const ROBOFLOW_API_KEY: &str = "g9zfZxZVNuSr43ENZJMg";
+const MODEL_VERSION_PATH: &str = "models/model_version.txt";
+const MANIFEST_URL: &str =
+    "https://raw.githubusercontent.com/kpauly/feeder-vision/main/manifest.json";
 
 enum ScanMsg {
     Progress(usize, usize),     // scanned, total
@@ -557,6 +609,75 @@ impl UiApp {
         });
         ui.add_space(4.0);
         ui.label("Uploads gebruiken een ingebouwde Roboflow API-sleutel en draaien volledig op de achtergrond.");
+
+        ui.add_space(16.0);
+        ui.separator();
+        ui.add_space(6.0);
+        ui.heading("Versies");
+        ui.label(format!("App versie: {}", self.app_version));
+        ui.label(format!(
+            "Herkenningsmodel en soortenlijstversie: {}",
+            self.model_version
+        ));
+        self.render_update_section(ui);
+    }
+
+    fn render_update_section(&mut self, ui: &mut egui::Ui) {
+        ui.add_space(8.0);
+        ui.separator();
+        ui.add_space(6.0);
+        ui.heading("Updates");
+        match &self.manifest_status {
+            ManifestStatus::Idle => {
+                if ui.button("Controleer op updates").clicked() {
+                    self.request_manifest_refresh();
+                }
+            }
+            ManifestStatus::Checking => {
+                ui.label("Zoeken naar updates...");
+            }
+            ManifestStatus::Error(err) => {
+                ui.colored_label(egui::Color32::RED, err);
+                if ui.button("Opnieuw proberen").clicked() {
+                    self.request_manifest_refresh();
+                }
+            }
+            ManifestStatus::Ready(summary) => {
+                if summary.app_update_available {
+                    ui.colored_label(
+                        egui::Color32::YELLOW,
+                        format!("Nieuwe app-versie beschikbaar: {}", summary.latest_app),
+                    );
+                    ui.hyperlink_to("Open downloadpagina", &summary.app_url);
+                } else {
+                    ui.label("Je gebruikt de nieuwste app-versie.");
+                }
+                ui.add_space(4.0);
+                if summary.model_update_available {
+                    ui.colored_label(
+                        egui::Color32::YELLOW,
+                        format!(
+                            "Nieuw herkenningsmodel beschikbaar: {}",
+                            summary.latest_model
+                        ),
+                    );
+                    if let Some(size) = summary.model_size_mb {
+                        ui.label(format!("Geschatte downloadgrootte: {:.1} MB", size));
+                    }
+                    if let Some(notes) = &summary.model_notes {
+                        ui.label(notes);
+                    }
+                    ui.hyperlink_to("Bekijk release", &summary.model_url);
+                    ui.label("Modelupdates kunnen nog niet automatisch worden gedownload.");
+                } else {
+                    ui.label("Herkenningsmodel is up-to-date.");
+                }
+                ui.add_space(6.0);
+                if ui.button("Opnieuw controleren").clicked() {
+                    self.request_manifest_refresh();
+                }
+            }
+        }
     }
 
     fn render_folder_panel(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
@@ -972,6 +1093,7 @@ impl App for UiApp {
         while let Ok(msg) = self.upload_status_rx.try_recv() {
             self.status = msg;
         }
+        self.poll_manifest_updates();
         // Drain scan messages first
         if let Some(rx) = self.rx.take() {
             let mut keep = true;
@@ -1124,6 +1246,67 @@ impl UiApp {
             });
         }
         options
+    }
+
+    fn load_model_version() -> String {
+        match std::fs::read_to_string(MODEL_VERSION_PATH) {
+            Ok(content) => {
+                let trimmed = content.trim();
+                if trimmed.is_empty() {
+                    "onbekend".to_string()
+                } else {
+                    trimmed.to_string()
+                }
+            }
+            Err(err) => {
+                tracing::warn!("Kon modelversie niet lezen: {err}");
+                "onbekend".to_string()
+            }
+        }
+    }
+
+    fn request_manifest_refresh(&mut self) {
+        if matches!(self.manifest_status, ManifestStatus::Checking) {
+            return;
+        }
+        let (tx, rx) = mpsc::channel();
+        self.update_rx = Some(rx);
+        self.manifest_status = ManifestStatus::Checking;
+        thread::spawn(move || {
+            let result = fetch_remote_manifest().map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        });
+    }
+
+    fn poll_manifest_updates(&mut self) {
+        if let Some(rx) = self.update_rx.take() {
+            match rx.try_recv() {
+                Ok(Ok(manifest)) => self.apply_manifest(manifest),
+                Ok(Err(err)) => self.manifest_status = ManifestStatus::Error(err),
+                Err(TryRecvError::Empty) => {
+                    self.update_rx = Some(rx);
+                }
+                Err(TryRecvError::Disconnected) => {
+                    self.manifest_status =
+                        ManifestStatus::Error("Zoeken naar updates is mislukt".to_string());
+                }
+            }
+        }
+    }
+
+    fn apply_manifest(&mut self, manifest: RemoteManifest) {
+        let mut summary = UpdateSummary {
+            latest_app: manifest.app.latest.clone(),
+            app_url: manifest.app.url.clone(),
+            latest_model: manifest.model.latest.clone(),
+            model_url: manifest.model.url.clone(),
+            model_size_mb: manifest.model.size_mb,
+            model_notes: manifest.model.notes.clone(),
+            ..Default::default()
+        };
+        summary.app_update_available = version_is_newer(&manifest.app.latest, &self.app_version);
+        summary.model_update_available = manifest.model.latest.trim() != self.model_version.trim();
+        self.manifest_status = ManifestStatus::Ready(summary);
     }
 
     fn render_context_menu(&mut self, ui: &mut egui::Ui, indices: &[usize]) {
@@ -1811,6 +1994,13 @@ fn fallback_display_label(name: &str) -> String {
     result
 }
 
+fn version_is_newer(latest: &str, current: &str) -> bool {
+    match (Version::parse(latest), Version::parse(current)) {
+        (Ok(lat), Ok(curr)) => lat > curr,
+        _ => latest != current,
+    }
+}
+
 fn sanitize_for_path(input: &str) -> String {
     let mut sanitized = String::with_capacity(input.len());
     for ch in input.chars() {
@@ -1899,6 +2089,47 @@ fn parse_coordinates(input: &str) -> anyhow::Result<(f64, f64)> {
         .parse::<f64>()
         .with_context(|| "Longitude kon niet gelezen worden")?;
     Ok((lat, lng))
+}
+
+fn fetch_remote_manifest() -> anyhow::Result<RemoteManifest> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .context("HTTP-client kon niet worden opgebouwd")?;
+    let response = client
+        .get(MANIFEST_URL)
+        .send()
+        .context("Manifest kon niet worden opgehaald")?
+        .error_for_status()
+        .context("Manifest gaf een foutstatus terug")?;
+    let manifest = response
+        .json::<RemoteManifest>()
+        .context("Manifest kon niet worden geparseerd")?;
+    Ok(manifest)
+}
+
+#[derive(Debug, Deserialize)]
+struct RemoteManifest {
+    app: ManifestEntry,
+    model: ModelManifestEntry,
+}
+
+#[derive(Debug, Deserialize)]
+struct ManifestEntry {
+    latest: String,
+    url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelManifestEntry {
+    latest: String,
+    url: String,
+    #[serde(default)]
+    _labels_hash: Option<String>,
+    #[serde(default)]
+    size_mb: Option<f32>,
+    #[serde(default)]
+    notes: Option<String>,
 }
 
 fn upload_to_roboflow(
