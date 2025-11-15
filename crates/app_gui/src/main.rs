@@ -3,6 +3,7 @@
 use arboard::Clipboard;
 use chrono::{DateTime, Local};
 use eframe::{App, Frame, NativeOptions, egui};
+use egui::viewport::{IconData, ViewportBuilder};
 use feeder_core::{
     Classification, ClassifierConfig, Decision, EfficientVitClassifier, ImageInfo, ScanOptions,
     scan_folder_with,
@@ -11,6 +12,7 @@ use rfd::FileDialog;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -18,9 +20,12 @@ use std::time::{Duration, Instant};
 fn main() {
     #[cfg(debug_assertions)]
     tracing_subscriber::fmt::init();
-    let options = NativeOptions::default();
+    let options = NativeOptions {
+        viewport: ViewportBuilder::default().with_icon(Arc::new(load_app_icon())),
+        ..Default::default()
+    };
     if let Err(e) = eframe::run_native(
-        "Feeder Vision (preview)",
+        "Feedie",
         options,
         Box::new(|_cc| {
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(Box::new(UiApp::default()))
@@ -1766,6 +1771,25 @@ fn canonical_label(name: &str) -> String {
         .unwrap_or(stripped);
     let cleaned = primary.trim_end_matches(['.', ',']).trim();
     cleaned.to_ascii_lowercase()
+}
+
+fn load_app_icon() -> IconData {
+    const ICON_BYTES: &[u8] = include_bytes!("../../../assets/Feedie_icon.png");
+    match image::load_from_memory(ICON_BYTES) {
+        Ok(img) => {
+            let rgba = img.to_rgba8();
+            let (width, height) = rgba.dimensions();
+            IconData {
+                rgba: rgba.into_raw(),
+                width,
+                height,
+            }
+        }
+        Err(err) => {
+            tracing::warn!("Kon app-icoon niet laden: {err}");
+            IconData::default()
+        }
+    }
 }
 
 fn fallback_display_label(name: &str) -> String {
