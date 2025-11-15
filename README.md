@@ -40,7 +40,7 @@ Feedie was born out of a need for a simple, efficient, and user-friendly tool to
 - **EfficientViT inference** – Runs the bundled EfficientViT-M0 weights on CPU with configurable thresholds and background classes.
 - **Smart galleries** – Tabs for `Aanwezig`, `Leeg`, and `Onzeker` so you can triage detections quickly.
 - **Context menu actions** – Assign species, mark background, or create new labels on batches of thumbnails.
-- **Export workflows** – Per-selection export via context menu or batch export from the dedicated tab (species folders, Onzeker bundle, Leeg bundle, CSV with metadata). The CSV file format is compatible with [Observation.org](https://observation.org/) for bulk import.
+- **Export workflows** – Per-selection export via context menu or batch export from the dedicated tab (species folders, Onzeker bundle, Leeg bundle, CSV with metadata). The CSV file format is compatible with [Observation.org](https://observation.org/) (waarnemingen.be/waarneming.nl) for bulk import.
 - **Model updater** – Checks `manifest.json`, shows available app/model versions, and can download/install new models automatically into `%AppData%\Feedie\models`.
 - **Roboflow opt-in uploader** – When enabled, manual relabels are uploaded in the background without blocking the UI. This enables regular model improvements through community contributions.
  
