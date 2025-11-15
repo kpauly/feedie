@@ -58,7 +58,8 @@
   - [x] Paneel met checkboxen voor aanwezige/onzekere/achtergrondfoto's en CSV-export
   - [x] Exportknop opent mapkiezer en (voor CSV) coördinatenprompt
   - [x] Submappen per gekozen categorie + batch-copy met `<label>_<origineel>.jpg`
-  - [x] CSV (`feeder_vision.csv`) met `date,time,scientific name,lat,lng,path` gevuld via labels.csv en ingevoerde coördinaten
+  - [x] Submaplogica volgt de galerijen (Aanwezig → soortmappen, Onzeker, Leeg)
+  - [x] CSV (`voederhuiscamera_yymmddhhmm.csv`) met `date,time,scientific name,lat,lng,path` gevuld via labels.csv en ingevoerde coördinaten
   - [ ] (Follow-up) Voortgang/rapportage tijdens batch export
 - [ ] **G3. Reference manager**
   - [ ] Add to reference → embedding → user index

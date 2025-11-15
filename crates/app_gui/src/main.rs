@@ -1588,15 +1588,16 @@ impl UiApp {
     fn collect_export_jobs(&self, options: &ExportOptions) -> Vec<ExportJob> {
         let mut jobs = Vec::new();
         for info in &self.rijen {
-            if options.include_present && info.present {
-                if let Some((display, canonical)) = self.present_label(info) {
-                    jobs.push(ExportJob {
-                        source: info.file.clone(),
-                        folder_label: display,
-                        canonical_label: Some(canonical),
-                        include_in_csv: options.include_csv,
-                    });
-                }
+            if options.include_present
+                && info.present
+                && let Some((display, canonical)) = self.present_label(info)
+            {
+                jobs.push(ExportJob {
+                    source: info.file.clone(),
+                    folder_label: display,
+                    canonical_label: Some(canonical),
+                    include_in_csv: options.include_csv,
+                });
             }
             if options.include_uncertain && self.is_onzeker(info) {
                 jobs.push(ExportJob {
@@ -1763,9 +1764,7 @@ fn canonical_label(name: &str) -> String {
         .split_once(',')
         .map(|(first, _)| first.trim())
         .unwrap_or(stripped);
-    let cleaned = primary
-        .trim_end_matches(|c: char| c == '.' || c == ',')
-        .trim();
+    let cleaned = primary.trim_end_matches(['.', ',']).trim();
     cleaned.to_ascii_lowercase()
 }
 
