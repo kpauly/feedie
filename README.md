@@ -132,7 +132,6 @@ CI helper scripts:
 
 We welcome contributions and feedback! Ideas:
 
-- Improve EfficientViT training (see `models/` + `specs/tasks.md`)
 - Polish UI/UX or translations
 - Add new export formats or automation scripts
 - Build integrations using `feeder_core`
