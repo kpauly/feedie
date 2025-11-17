@@ -1,4 +1,5 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+//! Entry point for the Feedie egui desktop application.
 
 mod app;
 mod export;
@@ -13,7 +14,7 @@ use egui::viewport::ViewportBuilder;
 use std::sync::Arc;
 use util::load_app_icon;
 
-/// Bootstraps the egui application and installs tracing when debugging.
+/// Bootstraps the egui application and installs tracing and the window icon.
 fn main() {
     #[cfg(debug_assertions)]
     tracing_subscriber::fmt::init();

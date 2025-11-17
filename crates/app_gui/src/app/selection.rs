@@ -1,3 +1,5 @@
+//! Selection utilities for the results grid.
+
 use super::{UiApp, ViewMode};
 use eframe::egui;
 

@@ -1,3 +1,5 @@
+//! Folder selection workflow and scan orchestration.
+
 use super::{Panel, ScanMsg, UiApp, ViewMode};
 use eframe::egui;
 use feeder_core::{EfficientVitClassifier, ScanOptions, scan_folder_with};

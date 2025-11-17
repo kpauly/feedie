@@ -1,7 +1,10 @@
+//! Management of the floating image preview window.
+
 use super::{UiApp, ViewMode};
 use eframe::egui;
 use feeder_core::Decision;
 
+/// Actions a preview session can request from the controller.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PreviewAction {
     None,

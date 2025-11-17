@@ -1,3 +1,5 @@
+//! Settings panel rendering for thresholds, uploads, and updates.
+
 use super::{Panel, UiApp};
 use eframe::egui;
 

@@ -1,3 +1,5 @@
+//! Core application state for the Feedie GUI.
+
 use crate::export::{CoordinatePrompt, PendingExport};
 use crate::manifest::{ManifestStatus, ModelDownloadStatus};
 use eframe::{App, Frame, egui};
@@ -17,6 +19,9 @@ mod thumbnails;
 use self::preview::PreviewState;
 
 /// Determines which subset of images is visible in the results grid.
+///
+/// Each mode filters the classifier results differently and drives the counters
+/// shown at the top of the “Scanresultaat” panel.
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ViewMode {
     #[default]
@@ -25,7 +30,7 @@ pub(crate) enum ViewMode {
     Onzeker,
 }
 
-/// Identifies the panel that is currently shown in the sidebar.
+/// Identifies the panel that is currently shown in the top navigation bar.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Panel {
     Folder,
@@ -43,6 +48,19 @@ pub(crate) struct LabelOption {
 }
 
 /// Root egui application state that wires together all modules.
+///
+/// The `UiApp` is owned by `eframe` and persists for the lifetime of the
+/// application. It stores user choices, scan results, textures, background task
+/// channels, and metadata such as version information.
+///
+/// # Examples
+///
+/// ```
+/// // Constructing UiApp uses defaults and requests the manifest in the background.
+/// let mut app = feedie::UiApp::default();
+/// // In tests you can toggle panels directly.
+/// app.panel = feedie::Panel::Results;
+/// ```
 pub struct UiApp {
     pub(crate) gekozen_map: Option<PathBuf>,
     pub(crate) rijen: Vec<ImageInfo>,
@@ -152,20 +170,34 @@ impl Default for UiApp {
     }
 }
 
+/// Width/height of loaded thumbnails.
 pub(crate) const THUMB_SIZE: u32 = 120;
+/// Maximum number of thumbnails cached in memory at once.
 pub(crate) const MAX_THUMBS: usize = 256;
+/// Maximum number of full resolution textures cached for the preview window.
 pub(crate) const MAX_FULL_IMAGES: usize = 32;
+/// Hard limit to avoid decoding too many thumbnails per frame.
 pub(crate) const MAX_THUMB_LOAD_PER_FRAME: usize = 12;
+/// Width allocated for a thumbnail card.
 pub(crate) const CARD_WIDTH: f32 = THUMB_SIZE as f32 + 40.0;
+/// Height allocated for a thumbnail card.
 pub(crate) const CARD_HEIGHT: f32 = THUMB_SIZE as f32 + 70.0;
+/// Built-in Roboflow API key for optional uploads.
 pub(crate) const ROBOFLOW_API_KEY: &str = "g9zfZxZVNuSr43ENZJMg";
+/// Remote manifest location that describes available updates.
 pub(crate) const MANIFEST_URL: &str =
     "https://github.com/kpauly/feeder-vision/raw/main/manifest.json";
+/// Name of the bundled EfficientViT model weights.
 pub(crate) const MODEL_FILE_NAME: &str = "feeder-efficientvit-m0.safetensors";
+/// Name of the CSV file containing labels.
 pub(crate) const LABEL_FILE_NAME: &str = "feeder-labels.csv";
+/// Name of the on-disk file that stores the model version that was installed.
 pub(crate) const VERSION_FILE_NAME: &str = "model_version.txt";
 
 /// Messages that flow back from the background scanning thread.
+///
+/// `ScanMsg` keeps the UI decoupled from the worker and allows us to report
+/// progress or replace the entire result set once classification finishes.
 pub(crate) enum ScanMsg {
     Progress(usize, usize),
     Done(Vec<ImageInfo>, u128),
@@ -173,6 +205,7 @@ pub(crate) enum ScanMsg {
 }
 
 impl App for UiApp {
+    /// Called every egui frame to keep background tasks and panels responsive.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut Frame) {
         self.refresh_background_state(ctx);
         self.render_navigation(ctx);

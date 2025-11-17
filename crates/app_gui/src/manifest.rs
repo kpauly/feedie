@@ -1,3 +1,5 @@
+//! Handling of remote manifests and model downloads.
+
 use crate::app::{LABEL_FILE_NAME, MANIFEST_URL, MODEL_FILE_NAME, UiApp, VERSION_FILE_NAME};
 use crate::model::{normalize_model_version, read_model_version_from};
 use anyhow::{Context, anyhow};
@@ -15,6 +17,9 @@ use tempfile::tempdir;
 use zip::ZipArchive;
 
 /// Summary of available updates for the application and model.
+///
+/// This mirrors the user-facing information in the “Versies” section and is
+/// populated by [`apply_manifest`].
 #[derive(Clone, Default)]
 pub(crate) struct UpdateSummary {
     pub(crate) latest_app: String,
@@ -49,6 +54,8 @@ pub(crate) enum ModelDownloadStatus {
 
 impl UiApp {
     /// Starts a background task that fetches the remote manifest file.
+    ///
+    /// The call is idempotent while a previous fetch is still running.
     pub(crate) fn request_manifest_refresh(&mut self) {
         if matches!(self.manifest_status, ManifestStatus::Checking) {
             return;
@@ -77,7 +84,7 @@ impl UiApp {
         }
     }
 
-    /// Applies the newly fetched manifest to the UI state.
+    /// Applies the newly fetched manifest to the UI state and stamps the change.
     pub(crate) fn apply_manifest(&mut self, manifest: RemoteManifest) {
         let latest_app = manifest.app.latest.clone();
         let latest_model = manifest.model.latest.clone();
@@ -103,6 +110,9 @@ impl UiApp {
     }
 
     /// Renders the update information inside the settings panel.
+    ///
+    /// This helper pulls state from [`ManifestStatus`] and exposes the
+    /// “Controleer op updates” affordances to the user.
     pub(crate) fn render_update_section(&mut self, ui: &mut egui::Ui) {
         ui.add_space(8.0);
         ui.separator();
@@ -254,18 +264,21 @@ impl UiApp {
     }
 }
 
+/// JSON layout returned by the remote manifest endpoint.
 #[derive(Debug, Deserialize)]
 pub(crate) struct RemoteManifest {
     app: ManifestEntry,
     model: ModelManifestEntry,
 }
 
+/// Manifest subsection describing the application binary.
 #[derive(Debug, Deserialize)]
 struct ManifestEntry {
     latest: String,
     url: String,
 }
 
+/// Manifest subsection describing the downloadable recognition model.
 #[derive(Debug, Deserialize)]
 struct ModelManifestEntry {
     latest: String,
@@ -278,6 +291,7 @@ struct ModelManifestEntry {
     notes: Option<String>,
 }
 
+/// Downloads and parses the JSON manifest that describes available updates.
 fn fetch_remote_manifest() -> anyhow::Result<RemoteManifest> {
     let client = Client::builder()
         .timeout(Duration::from_secs(5))
@@ -295,6 +309,7 @@ fn fetch_remote_manifest() -> anyhow::Result<RemoteManifest> {
     Ok(manifest)
 }
 
+/// Returns true if `latest` represents a version newer than `current`.
 fn version_is_newer(latest: &str, current: &str) -> bool {
     match (Version::parse(latest), Version::parse(current)) {
         (Ok(lat), Ok(curr)) => lat > curr,
@@ -302,6 +317,7 @@ fn version_is_newer(latest: &str, current: &str) -> bool {
     }
 }
 
+/// Downloads the model ZIP from `url` and installs it into `target_root`.
 fn download_and_install_model(url: &str, target_root: &Path, version: &str) -> anyhow::Result<()> {
     let client = Client::builder()
         .timeout(Duration::from_secs(60))

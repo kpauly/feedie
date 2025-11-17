@@ -1,3 +1,5 @@
+//! Export workflow for saving selections and CSV data.
+
 use crate::app::{LabelOption, ROBOFLOW_API_KEY, UiApp};
 use crate::roboflow::upload_to_roboflow;
 use crate::util::{
@@ -16,6 +18,7 @@ use std::path::{Path, PathBuf};
 
 /// Controls which subsets of photos will be exported.
 #[derive(Clone)]
+/// User-facing export toggles expanded into actionable options.
 struct ExportOptions {
     include_present: bool,
     include_uncertain: bool,
@@ -39,6 +42,7 @@ struct ExportOutcome {
 }
 
 /// Captures the work that needs to be done during an export run.
+/// Unit of work for copying a single photo and optionally annotating it.
 struct ExportJob {
     source: PathBuf,
     folder_label: String,
@@ -54,6 +58,7 @@ pub(crate) struct CoordinatePrompt {
 }
 
 /// CSV record that mirrors a single exported observation.
+/// In-memory representation of a CSV row.
 struct CsvRecord {
     date: String,
     time: String,
@@ -103,6 +108,7 @@ impl UiApp {
     }
 
     /// Determines whether the export button should be enabled.
+    /// Returns true when at least one category is selected for export.
     fn can_export_from_panel(&self) -> bool {
         self.has_scanned
             && !self.rijen.is_empty()
@@ -110,6 +116,7 @@ impl UiApp {
     }
 
     /// Opens the folder picker and prepares a pending export job.
+    /// Opens the directory picker and stores the pending export configuration.
     fn start_export_workflow(&mut self) {
         if !self.can_export_from_panel() {
             self.status = "Geen foto's om te exporteren.".to_string();
@@ -151,6 +158,7 @@ impl UiApp {
     }
 
     /// Shows a status message with the result of an export job.
+    /// Displays feedback after the export job has finished.
     fn handle_export_result(&mut self, result: anyhow::Result<ExportOutcome>) {
         match result {
             Ok(summary) => {
@@ -178,6 +186,7 @@ impl UiApp {
     }
 
     /// Finalizes an export once the user provided coordinates.
+    /// Continues the export containing CSV data once GPS coordinates are provided.
     fn complete_pending_export(&mut self, coords: (f64, f64)) {
         if let Some(pending) = self.pending_export.take() {
             let result = self.perform_export(pending, Some(coords));
@@ -316,6 +325,7 @@ impl UiApp {
     }
 
     /// Copies the underlying files for the supplied indices into `target_dir`.
+    /// Copies the requested files to the export directory and returns the count.
     fn copy_selection_to(&self, target_dir: &Path, indices: &[usize]) -> anyhow::Result<usize> {
         use anyhow::Context;
 
@@ -360,6 +370,7 @@ impl UiApp {
     }
 
     /// Picks the best label to use when exporting the provided image.
+    /// Chooses the best display label for the export folder name.
     fn label_for_export(&self, info: &ImageInfo) -> String {
         match info.classification.as_ref().map(|c| &c.decision) {
             Some(Decision::Label(name)) => self.display_for(name),
@@ -403,6 +414,7 @@ impl UiApp {
     }
 
     /// Performs the export workflow and optionally emits a CSV.
+    /// Executes the configured export and optionally writes the CSV summary.
     fn perform_export(
         &self,
         pending: PendingExport,
@@ -490,6 +502,7 @@ impl UiApp {
     }
 
     /// Collects all export jobs that match the configured options.
+    /// Builds the list of items that should be exported for the selected options.
     fn collect_export_jobs(&self, options: &ExportOptions) -> Vec<ExportJob> {
         let mut jobs = Vec::new();
         for info in &self.rijen {
@@ -525,6 +538,7 @@ impl UiApp {
     }
 
     /// Resolves the display and canonical label for present detections.
+    /// Returns the canonical/display label for rows considered present.
     fn present_label(&self, info: &ImageInfo) -> Option<(String, String)> {
         let classification = info.classification.as_ref()?;
         if let Decision::Label(name) = &classification.decision {
@@ -539,11 +553,13 @@ impl UiApp {
     }
 
     /// Determines whether a capture should be treated as background.
+    /// Returns true if a row falls under the "Leeg" export bucket.
     fn belongs_in_leeg(&self, info: &ImageInfo) -> bool {
         !info.present && !self.is_onzeker(info)
     }
 
     /// Looks up the scientific name for a canonical label if known.
+    /// Finds the optional scientific name for the provided canonical label.
     fn scientific_for(&self, canonical: &str) -> Option<String> {
         self.label_options
             .iter()
@@ -676,6 +692,7 @@ impl UiApp {
 }
 
 /// Writes the CSV summary file for a completed export.
+/// Writes the CSV summary that Roboflow/others can ingest.
 fn write_export_csv(
     dir: &Path,
     records: &[CsvRecord],

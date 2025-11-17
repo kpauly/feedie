@@ -1,3 +1,5 @@
+//! Navigation and frame orchestration helpers.
+
 use super::{Panel, ScanMsg, UiApp};
 use eframe::egui;
 use std::time::Duration;
@@ -85,6 +87,7 @@ impl UiApp {
         });
     }
 
+    /// Summarizes the current status string or returns a default.
     fn status_message(&self) -> String {
         if self.status.is_empty() {
             if self.scan_in_progress {
@@ -99,6 +102,7 @@ impl UiApp {
         }
     }
 
+    /// Pulls messages from the scan worker and updates progress/result state.
     fn drain_scan_channel(&mut self) {
         if let Some(rx) = self.rx.take() {
             let mut keep = true;

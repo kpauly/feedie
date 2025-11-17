@@ -1,3 +1,5 @@
+//! Thumbnail and preview texture caching helpers.
+
 use super::{MAX_FULL_IMAGES, MAX_THUMBS, THUMB_SIZE, UiApp};
 use eframe::egui;
 use std::path::Path;

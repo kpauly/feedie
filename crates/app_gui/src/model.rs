@@ -1,3 +1,5 @@
+//! Model installation helpers and confidence heuristics.
+
 use crate::app::{LABEL_FILE_NAME, LabelOption, MODEL_FILE_NAME, UiApp, VERSION_FILE_NAME};
 use crate::util::canonical_label;
 use anyhow::{Context, anyhow};

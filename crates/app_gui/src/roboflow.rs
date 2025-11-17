@@ -1,3 +1,5 @@
+//! Roboflow upload helper used when sharing manual corrections.
+
 use anyhow::{Context, anyhow};
 use reqwest::blocking::{Client, multipart};
 use std::path::Path;

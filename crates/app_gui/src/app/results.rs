@@ -1,3 +1,5 @@
+//! Rendering of the results grid and associated interactions.
+
 use super::{CARD_HEIGHT, CARD_WIDTH, MAX_THUMB_LOAD_PER_FRAME, THUMB_SIZE, UiApp, ViewMode};
 use eframe::egui;
 use feeder_core::{Decision, ImageInfo};
