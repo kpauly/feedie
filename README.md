@@ -9,8 +9,9 @@
 [![Built with Rust](https://img.shields.io/badge/built%20with-Rust-orange.svg?logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue)](https://polyformproject.org/licenses/noncommercial/1.0.0/)
 [![Platform](https://img.shields.io/badge/platform-Windows%2011-blue?logo=windows)](https://github.com/kpauly/feeder-vision/releases)
+[![Platform](https://shields.io/badge/MacOS--9cf?logo=Apple&style=social)](https://github.com/kpauly/feeder-vision/releases)
 
-Feedie is a native Windows application that scans SD-card dump folders from your wildlife feeder camera, detects visitors with an EfficientViT model, and helps you export curated images and CSV reports. Everything runs fast on CPU only and locally — no cloud upload unless you explicitly opt in to sharing samples with Roboflow. The entire app is targeted to non-tech savvy users, and only available in Dutch for the moment. Additional languages (starting with English) are planned. The embedded model currently targets common garden species in Belgium and the Netherlands. Releases for other Operating Systems are also planned.
+Feedie is a native application available for Windows and MacOS that scans SD-card dump folders from your wildlife feeder camera, detects visitors with an EfficientViT model, and helps you export curated images and CSV reports. Everything runs fast on CPU only and locally — no cloud upload unless you explicitly opt in to sharing samples with Roboflow. The entire app is targeted to non-tech savvy users, and only available in Dutch for the moment. Additional languages (starting with English) are planned. The embedded model currently targets common garden species in Belgium and the Netherlands.
 
 ---
 
@@ -67,9 +68,11 @@ Feedie was born out of a need for a simple, efficient, and user-friendly tool to
 
 ## Download & install
 
-1. Grab the latest `FeedieSetup.exe` from the [GitHub releases](https://github.com/kpauly/feeder-vision/releases).
-2. Run the installer (administrator privileges required). Feedie is installed to `C:\Program Files\Feedie`.
+1. Grab the latest `FeedieSetup-vX.Y.Z.exe` (for Windows) or `Feedie-mac-vX.Y.Z.zip` (for MacOS) from the [GitHub releases](https://github.com/kpauly/feeder-vision/releases).
+2. **Windows**: Run the installer. You may be warned a couple of times that you are about to install an app from an unknown publisher, but you can just accept. Feedie is installed to `C:\Program Files (x86)\Feedie`.
+**MacOS**: Open the downloaded zip file, drag `Feedie.app` into `/Applications` and run Feedie from there (accept the warning on first run).
 3. Launch Feedie from the Start menu. The bundled model is copied to `%AppData%\Feedie\models` on first run so you can work offline immediately.
+The Instellingen tab will show your currently installed app/model versions and automatically check for available updates.
 
 > Prefer a portable build? Run `cargo build --release -p app_gui` and start `target\release\Feedie.exe`.
 
@@ -154,7 +157,7 @@ Feedie is distributed under the [PolyForm Noncommercial License 1.0.0](https://p
 
 ## Acknowledgements
 
-The entire app and documentation is built using [Zed](https://zed.dev) with the [OpenAI Codex via ACP](https://zed.dev/blog/codex-is-live-in-zed). The openly available classification model training dataset is maintained, labeled and versioned on [Roboflow](https://universe.roboflow.com/kp-dsglx/voederhuiscamera). The dataset has an associated proprietary trained model available for inference on Roboflow, but a model for local in-app use was based on EfficientViT-M0 pretrained on Imagenet-1k, available from [Hugging Face](https://huggingface.co/timm/efficientvit_m0.r224_in1k) and fine-tuned on [Google Colab](https://colab.research.google.com). It was implemented natively (without requiring an external runtime) using [Candle](https://github.com/huggingface/candle) and exposed through [egui/eframe](https://github.com/emilk/egui). The Feedie icon was designed from [ChatGPT](https://chatgpt.com). The app installer was built using [Inno Setup](https://jrsoftware.org/isinfo.php).
+The entire app and documentation is built using [Zed](https://zed.dev) with the [OpenAI Codex via ACP](https://zed.dev/blog/codex-is-live-in-zed). The openly available classification model training dataset is maintained, labeled and versioned on [Roboflow](https://universe.roboflow.com/kp-dsglx/voederhuiscamera). The dataset has an associated proprietary trained model available for inference on Roboflow, but a model for local in-app use was based on EfficientViT-M0 pretrained on Imagenet-1k, available from [Hugging Face](https://huggingface.co/timm/efficientvit_m0.r224_in1k) and fine-tuned on [Google Colab](https://colab.research.google.com). It was implemented natively (without requiring an external runtime) using [Candle](https://github.com/huggingface/candle) and exposed through [egui/eframe](https://github.com/emilk/egui). The Feedie icon was designed from [ChatGPT](https://chatgpt.com). App binaries and Windows installer are built through GitHub Actions.
 
 ---
 
