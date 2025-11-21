@@ -96,8 +96,12 @@ a {
     max-width: 520px;
 }
 
+.hero-image {
+    text-align: center;
+}
+
 .hero-image img {
-    max-width: 660px;
+    width: clamp(240px, 55vw, 900px);
     margin: 0 auto;
 }
 
