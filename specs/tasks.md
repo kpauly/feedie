@@ -100,9 +100,14 @@
 - [x] **P2. Release**
   - [x] `cargo build --release`; smoke on Windows 11
   - [x] Windows installer (`FeedieSetup.exe`) published with bundled model
+  - [x] macOS universele build (`Feedie-mac.zip`) via GitHub Actions
   - [ ] (Optional) self-update later via `self_update`
 - [x] **P3. Manifest & updater**
   - [x] `manifest.json` hosted via GitHub raw
   - [x] In-app version display + manifest fetch with retry/error states
   - [x] Automatic model ZIP download/extract into `%AppData%\Feedie\models`
   - [ ] (Follow-up) App auto-update prompt/linking to latest installer
+
+- [x] **P4. Website & releases**
+  - [x] GitHub Pages site (`docs/`) in het Nederlands met downloadknoppen die automatisch naar de laatste release verwijzen
+  - [x] Release notes bundelen beide installers onder dezelfde tag

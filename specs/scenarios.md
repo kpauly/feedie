@@ -56,4 +56,4 @@ And "Exporteer foto's met aanwezige soorten" and "Exporteer identificatieresulta
 When the user clicks "Exporteer", chooses a destination folder, and pastes the Google Maps coordinates in the prompt
 Then the app creates subfolders per geselecteerde optie (per soort, "Onzeker", "Achtergrond")
 And copies the relevant images as `<label>_<originalfilename>.jpg` into each subfolder
-And writes `feeder_vision.csv` in the exportroot met kolommen `date,time,scientific name,lat,lng,path` ingevuld met de ingevoerde coördinaten en de nieuwe bestandslocaties
+And writes `voederhuiscamera_yymmddhhmm.csv` in the exportroot met kolommen `date,time,scientific name,lat,lng,path` ingevuld met de ingevoerde coördinaten en de nieuwe bestandslocaties

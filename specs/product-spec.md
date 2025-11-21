@@ -1,7 +1,7 @@
-# Feeder Vision - Product Spec (v0.1)
+# Feedie - Product Spec (v0.1)
 
 ## Problem
-Users point to a feeder camera SD card dump folder with thousands of frames; they want animal presence + species offline and potentially file/folder reorganization.
+Users point to a feeder camera SD card dump folder with thousands of frames; they want animal presence + species offline and potentially file/folder reorganization on a modest Windows laptop or Mac.
 
 ## Scope v0
 - Single-stage **EfficientViT-m0** classifier (Candle) runs on every frame: resize to 224x224, normalize, batch tensors (default 8) and infer `present` + species directly on CPU.
@@ -17,9 +17,10 @@ Users point to a feeder camera SD card dump folder with thousands of frames; the
 - Snelle contextmenu-export: "Exporteren" bovenaan elke selectie laat je een doelmap kiezen, maakt submappen per soort aan en kopieert de geselecteerde beelden als `<soort>_<originele bestandsnaam>.jpg`.
 - Exporttab: aparte "Exporteren"-paneel met checkboxen voor aanwezige/onzekere/achtergrondfoto's en CSV-export; batch export creëert submappen en kan tegelijk een CSV met datum, tijd, wetenschappelijke naam, coördinaten en pad genereren.
 - Reference pack updater (check for updates, manual import).
-- EfficientViT model package: `.safetensors` weights + `labels.csv` shipped with the installer; updated models + training notebook live in `/models`.
+- EfficientViT model package: `.safetensors` weights + `labels.csv` shipped with both Windows installer en macOS app bundle; updated models + training notebook live in `/models`.
 - Roboflow feedback toggle: built-in API key + dataset field, with a background uploader that pushes every manual re-labelling (single or multi select) to dataset `voederhuiscamera`.
 - Contextmenu bevat een “Nieuw…”-optie waarmee gebruikers on-the-fly een nieuwe soortnaam kunnen ingeven; de selectie krijgt meteen het manuele label en (indien upload is ingeschakeld) wordt samen met het label naar Roboflow verstuurd.
+- Nederlandstalige productwebsite (GitHub Pages) met downloads die automatisch naar de laatste release verwijzen.
 
 ## Model training & dataset
 - Roboflow export (`Voederhuiscamera.v2i.multiclass/{train,valid,test}`) is the canonical dataset. Each split contains `_classes.csv` (one-hot labels) and preprocessed 512x512 JPGs.
@@ -49,8 +50,9 @@ Users point to a feeder camera SD card dump folder with thousands of frames; the
 - "Unknown"/empty is produced when the top probability is below `presence_threshold` or when the winning class is configured as a background label (e.g., "Achtergrond").
 - Longer-term: allow swapping in other Candle classifiers (ConvNeXt, etc.) without changing the GUI/CSV interface.
 
-## UX principles and i18n
+## UX principles, i18n & outreach
 - Audience: absolute beginners; UI must be sleek and KISS.
 - Do not expose expert options unless strictly necessary; rely on good defaults.
 - Primary flow controls only: choose folder, Scan, galerijweergave (Aanwezig | Leeg), Export CSV.
 - Dutch-only UI for v0; structure all strings for later multi-language support.
+- Begeleidende website in dezelfde stijl (Feedie blauw/bruin) zodat niet-technische gebruikers direct installatielinks en korte uitleg vinden.
