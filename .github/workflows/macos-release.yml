@@ -76,6 +76,15 @@ jobs:
           cp target/universal/release/Feedie \
             target/aarch64-apple-darwin/release/bundle/osx/Feedie.app/Contents/MacOS/Feedie
 
+      - name: Verify universal binary
+        run: |
+          ARCHES="$(lipo -info target/aarch64-apple-darwin/release/bundle/osx/Feedie.app/Contents/MacOS/Feedie)"
+          echo "$ARCHES"
+          if [[ "$ARCHES" != *"arm64"* || "$ARCHES" != *"x86_64"* ]]; then
+            echo "Universal binary check failed: $ARCHES"
+            exit 1
+          fi
+
       - name: Package unsigned app
         run: |
           cd target/aarch64-apple-darwin/release/bundle/osx
