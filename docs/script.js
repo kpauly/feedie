@@ -1,6 +1,7 @@
 const releaseLabel = document.getElementById("release-label");
 const windowsBtn = document.getElementById("download-windows");
-const macBtn = document.getElementById("download-mac");
+const macArmBtn = document.getElementById("download-mac-arm");
+const macIntelBtn = document.getElementById("download-mac-intel");
 const RELEASE_API =
   "https://api.github.com/repos/kpauly/feedie/releases/latest";
 
@@ -21,13 +22,17 @@ async function loadRelease() {
       assets.find((asset) => asset.name?.toLowerCase().includes(keyword));
 
     const windowsAsset = findAsset("feediesetup");
-    const macAsset = findAsset("feedie-mac");
+    const macArm = findAsset("feedie-mac-arm64");
+    const macIntel = findAsset("feedie-mac-intel");
 
     if (windowsAsset?.browser_download_url) {
       windowsBtn.href = windowsAsset.browser_download_url;
     }
-    if (macAsset?.browser_download_url) {
-      macBtn.href = macAsset.browser_download_url;
+    if (macArm?.browser_download_url) {
+      macArmBtn.href = macArm.browser_download_url;
+    }
+    if (macIntel?.browser_download_url) {
+      macIntelBtn.href = macIntel.browser_download_url;
     }
   } catch (error) {
     releaseLabel.textContent =
