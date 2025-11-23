@@ -165,4 +165,4 @@ The entire app and documentation is built using [Zed](https://zed.dev) with the 
 
 ---
 
-Happy birding! 🐦📸 If you build something on top of Feedie—new models, workflows, or accessories—we’d love to hear about it.
+Happy feeding! 🐦📸 If you build something on top of Feedie—new models, workflows, or accessories—we’d love to hear about it.
