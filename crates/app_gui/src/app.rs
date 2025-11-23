@@ -8,6 +8,7 @@ use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 
+mod cache;
 mod folder;
 mod frame;
 mod preview;

@@ -631,6 +631,9 @@ impl UiApp {
                 });
             }
         }
+
+        // Persist updated labels to cache if possible
+        self.save_cache_for_current_folder();
     }
 
     /// Adds a new manual label selected by the user.

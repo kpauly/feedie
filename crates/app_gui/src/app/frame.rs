@@ -122,6 +122,7 @@ impl UiApp {
                         self.presence_threshold = self.pending_presence_threshold;
                         self.apply_presence_threshold();
                         self.reset_selection();
+                        self.save_cache_for_current_folder();
                         let totaal = self.total_files;
                         let (count_present, _, _) = self.view_counts();
                         self.status = format!(

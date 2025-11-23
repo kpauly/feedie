@@ -72,6 +72,15 @@ impl UiApp {
         match scan_folder_with(&dir, ScanOptions { recursive: false }) {
             Ok(rows) => {
                 self.total_files = rows.len();
+                match self.try_load_cached_scan(&dir) {
+                    Ok(true) => {
+                        self.panel = Panel::Results;
+                    }
+                    Ok(false) => {}
+                    Err(err) => {
+                        tracing::warn!("Cache load failed: {err}");
+                    }
+                }
             }
             Err(e) => {
                 self.status = format!("Fout bij lezen van map: {e}");
