@@ -189,8 +189,8 @@ pub(crate) const CARD_WIDTH: f32 = THUMB_SIZE as f32 + 40.0;
 pub(crate) const CARD_HEIGHT: f32 = THUMB_SIZE as f32 + 70.0;
 /// Number of thumbnails displayed per page in the gallery view.
 pub(crate) const PAGE_SIZE: usize = 100;
-/// Built-in Roboflow API key for optional uploads.
-pub(crate) const ROBOFLOW_API_KEY: &str = "g9zfZxZVNuSr43ENZJMg";
+/// Roboflow API key for optional uploads (injected at build time; may be empty).
+pub(crate) const ROBOFLOW_API_KEY: &str = env!("ROBOFLOW_API_KEY");
 /// Remote manifest location that describes available updates.
 pub(crate) const MANIFEST_URL: &str = "https://github.com/kpauly/feedie/raw/main/manifest.json";
 /// Name of the bundled EfficientViT model weights.

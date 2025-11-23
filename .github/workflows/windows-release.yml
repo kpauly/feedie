@@ -51,6 +51,7 @@ jobs:
       - name: Build release binary
         env:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
+          FEEDIE_ROBOFLOW_API_KEY: ${{ secrets.FEEDIE_ROBOFLOW_API_KEY }}
         run: cargo build --release -p app_gui
 
       - name: Prepare Feedie binary

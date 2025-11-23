@@ -52,6 +52,7 @@ jobs:
       - name: Build release binaries
         env:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
+          FEEDIE_ROBOFLOW_API_KEY: ${{ secrets.FEEDIE_ROBOFLOW_API_KEY }}
         run: |
           cargo build --release --target aarch64-apple-darwin -p app_gui
           cargo build --release --target x86_64-apple-darwin -p app_gui
