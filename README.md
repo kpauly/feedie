@@ -138,9 +138,10 @@ CI helper scripts:
 
 We welcome contributions and feedback! Ideas:
 
-- Polish UI/UX or translations
-- Add new export formats or automation scripts
-- Build integrations using `feeder_core`
+- macOS testing and PRs that fix issues on Mac
+- Add support for additional OS
+- Add a "stats" tab to summarize/analyze scan results
+- Polish UI/UX and add translations
 
 Before submitting a PR:
 
