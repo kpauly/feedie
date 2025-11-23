@@ -30,7 +30,7 @@ Given a completed scan with both present and empty frames
 When the user toggles between "Present" and "Empty"
 Then each thumbnail shows the filename above, the predicted species + confidence below, and lazy-loads as needed
 And the user can select frames using click, Ctrl-click, Shift-range, or Ctrl-A for later context actions
-And the gallery shows 100 cards per page with pager controls at the top/bottom and keyboard navigation (arrows, Home/End, Page Up/Down) to move within/among pages
+And the gallery shows 100 cards per page with pager controls at the top/bottom and keyboard navigation (arrows, Home/End, Page Up/Down) to move within/among pages, including Shift + navigation to extend selection from the anchor
 
 Scenario 5: Opt-in Roboflow upload
 Given the Instellingen panel is open

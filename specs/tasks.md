@@ -41,7 +41,7 @@
 ## GUI (egui)
 - [x] **G1. Shell**
   - [x] Main window + folder picker + “Scan” button (Scenario 1)
-  - [x] Thumbnail grid with paging / lazy loading
+- [x] Thumbnail grid with paging / lazy loading (100 per page, keyboard navigation + shift-extend selection)
   - [x] Pre-scan summary (“Images in folder: N”)
   - [x] Background scanning worker + progress bar
   - [x] Thumbnail & preview cards show filename + species + confidence; Windows-style multi-select; Present/Empty/Uncertain tabs; standalone viewer
