@@ -116,12 +116,12 @@ impl UiApp {
                         self.scan_in_progress = false;
                         self.has_scanned = true;
                         self.rijen = rows;
+                        self.current_page = 0;
                         self.thumbs.clear();
                         self.thumb_keys.clear();
                         self.presence_threshold = self.pending_presence_threshold;
                         self.apply_presence_threshold();
-                        self.selected_indices.clear();
-                        self.selection_anchor = None;
+                        self.reset_selection();
                         let totaal = self.total_files;
                         let (count_present, _, _) = self.view_counts();
                         self.status = format!(

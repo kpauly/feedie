@@ -78,6 +78,8 @@ pub struct UiApp {
     pub(crate) full_keys: VecDeque<PathBuf>,
     pub(crate) selected_indices: BTreeSet<usize>,
     pub(crate) selection_anchor: Option<usize>,
+    pub(crate) selection_focus: Option<usize>,
+    pub(crate) current_page: usize,
     pub(crate) presence_threshold: f32,
     pub(crate) pending_presence_threshold: f32,
     pub(crate) batch_size: usize,
@@ -135,6 +137,8 @@ impl UiApp {
             full_keys: VecDeque::new(),
             selected_indices: BTreeSet::new(),
             selection_anchor: None,
+            selection_focus: None,
+            current_page: 0,
             presence_threshold: 0.5,
             pending_presence_threshold: 0.5,
             batch_size: 8,
@@ -182,6 +186,8 @@ pub(crate) const MAX_THUMB_LOAD_PER_FRAME: usize = 12;
 pub(crate) const CARD_WIDTH: f32 = THUMB_SIZE as f32 + 40.0;
 /// Height allocated for a thumbnail card.
 pub(crate) const CARD_HEIGHT: f32 = THUMB_SIZE as f32 + 70.0;
+/// Number of thumbnails displayed per page in the gallery view.
+pub(crate) const PAGE_SIZE: usize = 100;
 /// Built-in Roboflow API key for optional uploads.
 pub(crate) const ROBOFLOW_API_KEY: &str = "g9zfZxZVNuSr43ENZJMg";
 /// Remote manifest location that describes available updates.

@@ -1,8 +1,27 @@
 //! Rendering of the results grid and associated interactions.
 
-use super::{CARD_HEIGHT, CARD_WIDTH, MAX_THUMB_LOAD_PER_FRAME, THUMB_SIZE, UiApp, ViewMode};
+use super::{
+    CARD_HEIGHT, CARD_WIDTH, MAX_THUMB_LOAD_PER_FRAME, PAGE_SIZE, THUMB_SIZE, UiApp, ViewMode,
+};
 use eframe::egui;
 use feeder_core::{Decision, ImageInfo};
+
+const PAGE_SCROLL_STEP: f32 = CARD_HEIGHT + 20.0;
+
+enum PageCommand {
+    First,
+    Previous,
+    Next,
+    Last,
+}
+
+enum SelectionCommand {
+    Move(isize),
+    RowStart,
+    RowEnd,
+    First,
+    Last,
+}
 
 impl UiApp {
     /// Returns the caption that is shown under every thumbnail.
@@ -31,7 +50,7 @@ impl UiApp {
         idx: usize,
         is_selected: bool,
         loaded_this_frame: &mut usize,
-    ) -> egui::Response {
+    ) -> (egui::Response, egui::Rect) {
         let (file_path, file_label, caption) = {
             let info = &self.rijen[idx];
             let label = info
@@ -106,7 +125,7 @@ impl UiApp {
         response.context_menu(|ui| {
             self.render_context_menu(ui, &targets);
         });
-        response
+        (response, rect)
     }
 
     /// Renders the panel that shows scan results and thumbnails.
@@ -140,56 +159,94 @@ impl UiApp {
                 self.view = ViewMode::Aanwezig;
                 self.thumbs.clear();
                 self.thumb_keys.clear();
-                self.selected_indices.clear();
-                self.selection_anchor = None;
+                self.reset_selection();
+                self.current_page = 0;
             }
             if empty_btn.clicked() {
                 self.view = ViewMode::Leeg;
                 self.thumbs.clear();
                 self.thumb_keys.clear();
-                self.selected_indices.clear();
-                self.selection_anchor = None;
+                self.reset_selection();
+                self.current_page = 0;
             }
             if unsure_btn.clicked() {
                 self.view = ViewMode::Onzeker;
                 self.thumbs.clear();
                 self.thumb_keys.clear();
-                self.selected_indices.clear();
-                self.selection_anchor = None;
+                self.reset_selection();
+                self.current_page = 0;
             }
         });
 
         let filtered = self.filtered_indices();
-        self.handle_select_shortcuts(ctx, &filtered);
+        let total_pages = self.total_pages(filtered.len());
+        if self.current_page >= total_pages {
+            self.current_page = total_pages.saturating_sub(1);
+        }
+        let (start, end) = self.page_bounds(filtered.len());
+        let mut page_indices = &filtered[start..end];
+        let columns = self.estimate_columns(ui);
+        let (scroll_delta, selection_moved) =
+            self.handle_navigation_keys(ctx, page_indices, total_pages, columns);
+        let total_pages = self.total_pages(filtered.len());
+        if self.current_page >= total_pages {
+            self.current_page = total_pages.saturating_sub(1);
+        }
+        let (start, end) = self.page_bounds(filtered.len());
+        page_indices = &filtered[start..end];
+        self.handle_select_shortcuts(ctx, page_indices);
+        let target_focus = if selection_moved {
+            self.current_focus_index(page_indices)
+        } else {
+            None
+        };
 
         if filtered.is_empty() {
             ui.label("Geen frames om te tonen in deze weergave.");
         } else {
             ui.add_space(6.0);
+            self.render_page_controls(ui, total_pages);
+            ui.add_space(4.0);
             egui::ScrollArea::vertical()
                 .auto_shrink([false; 2])
                 .show(ui, |ui| {
+                    if scroll_delta.abs() > f32::EPSILON {
+                        ui.scroll_with_delta(egui::vec2(0.0, scroll_delta));
+                    }
                     let mut loaded_this_frame = 0usize;
+                    let mut target_rect: Option<egui::Rect> = None;
                     ui.horizontal_wrapped(|ui| {
-                        for &idx in &filtered {
+                        for &idx in page_indices {
                             let is_selected = self.selected_indices.contains(&idx);
-                            let response = self.draw_thumbnail_card(
+                            let (response, rect) = self.draw_thumbnail_card(
                                 ui,
                                 ctx,
                                 idx,
                                 is_selected,
                                 &mut loaded_this_frame,
                             );
+                            if Some(idx) == target_focus {
+                                target_rect = Some(rect);
+                            }
                             if response.clicked() {
                                 let modifiers = ctx.input(|i| i.modifiers);
-                                self.handle_selection_click(&filtered, idx, modifiers);
+                                self.handle_selection_click(page_indices, idx, modifiers);
                             }
                             if response.double_clicked() {
                                 self.open_preview(&filtered, idx);
                             }
                         }
                     });
+                    if selection_moved {
+                        if let Some(rect) = target_rect {
+                            ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                        }
+                    } else if let Some(rect) = target_rect {
+                        ui.scroll_to_rect(rect, Some(egui::Align::Center));
+                    }
                 });
+            ui.add_space(4.0);
+            self.render_page_controls(ui, total_pages);
         }
     }
 
@@ -240,5 +297,173 @@ impl UiApp {
                 }
             });
         });
+    }
+}
+
+impl UiApp {
+    fn total_pages(&self, len: usize) -> usize {
+        if len == 0 { 1 } else { len.div_ceil(PAGE_SIZE) }
+    }
+
+    fn page_bounds(&self, len: usize) -> (usize, usize) {
+        let start = self.current_page.saturating_mul(PAGE_SIZE);
+        let end = (start + PAGE_SIZE).min(len);
+        (start, end)
+    }
+
+    fn render_page_controls(&mut self, ui: &mut egui::Ui, total_pages: usize) {
+        ui.horizontal(|ui| {
+            let current = self.current_page;
+            let label = format!("Pagina {} | {}", current + 1, total_pages);
+            if ui
+                .add_enabled(current > 0, egui::Button::new("<<"))
+                .clicked()
+            {
+                self.goto_page(0, total_pages);
+            }
+            if ui
+                .add_enabled(current > 0, egui::Button::new("<"))
+                .clicked()
+            {
+                self.change_page_relative(-1, total_pages);
+            }
+            ui.label(label);
+            if ui
+                .add_enabled(current + 1 < total_pages, egui::Button::new(">"))
+                .clicked()
+            {
+                self.change_page_relative(1, total_pages);
+            }
+            if ui
+                .add_enabled(current + 1 < total_pages, egui::Button::new(">>"))
+                .clicked()
+            {
+                self.goto_page(total_pages.saturating_sub(1), total_pages);
+            }
+        });
+    }
+
+    fn goto_page(&mut self, new_page: usize, total_pages: usize) {
+        if total_pages == 0 {
+            return;
+        }
+        let target = new_page.min(total_pages.saturating_sub(1));
+        if self.current_page != target {
+            self.current_page = target;
+            self.reset_selection();
+        }
+    }
+
+    fn change_page_relative(&mut self, delta: isize, total_pages: usize) {
+        let current = self.current_page as isize;
+        let target = current + delta;
+        if target < 0 {
+            self.goto_page(0, total_pages);
+        } else {
+            self.goto_page(target as usize, total_pages);
+        }
+    }
+
+    fn estimate_columns(&self, ui: &egui::Ui) -> usize {
+        let spacing = ui.spacing().item_spacing.x;
+        let width = (CARD_WIDTH + spacing).max(1.0);
+        let available = ui.available_width().max(width);
+        ((available + spacing) / width).floor().max(1.0) as usize
+    }
+
+    fn handle_navigation_keys(
+        &mut self,
+        ctx: &egui::Context,
+        page_indices: &[usize],
+        total_pages: usize,
+        columns: usize,
+    ) -> (f32, bool) {
+        let has_focus = self.current_focus_index(page_indices).is_some();
+        let mut scroll_delta = 0.0f32;
+        let mut page_cmd: Option<PageCommand> = None;
+        let mut selection_cmd: Option<SelectionCommand> = None;
+        let mut extend_selection = false;
+        let mut selection_moved = false;
+        ctx.input_mut(|input| {
+            extend_selection = input.modifiers.shift;
+            if input.consume_key(egui::Modifiers::COMMAND, egui::Key::PageDown) {
+                page_cmd = Some(PageCommand::Last);
+                return;
+            }
+            if input.consume_key(egui::Modifiers::COMMAND, egui::Key::PageUp) {
+                page_cmd = Some(PageCommand::First);
+                return;
+            }
+            if input.consume_key(egui::Modifiers::NONE, egui::Key::PageDown) {
+                page_cmd = Some(PageCommand::Next);
+            } else if input.consume_key(egui::Modifiers::NONE, egui::Key::PageUp) {
+                page_cmd = Some(PageCommand::Previous);
+            }
+
+            if input.consume_key(egui::Modifiers::COMMAND, egui::Key::Home) {
+                selection_cmd = Some(SelectionCommand::First);
+                return;
+            }
+            if input.consume_key(egui::Modifiers::COMMAND, egui::Key::End) {
+                selection_cmd = Some(SelectionCommand::Last);
+                return;
+            }
+
+            if has_focus {
+                if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft) {
+                    selection_cmd = Some(SelectionCommand::Move(-1));
+                } else if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight) {
+                    selection_cmd = Some(SelectionCommand::Move(1));
+                } else if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp) {
+                    let step = columns.max(1) as isize;
+                    selection_cmd = Some(SelectionCommand::Move(-step));
+                } else if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown) {
+                    let step = columns.max(1) as isize;
+                    selection_cmd = Some(SelectionCommand::Move(step));
+                } else if input.consume_key(egui::Modifiers::NONE, egui::Key::Home) {
+                    selection_cmd = Some(SelectionCommand::RowStart);
+                } else if input.consume_key(egui::Modifiers::NONE, egui::Key::End) {
+                    selection_cmd = Some(SelectionCommand::RowEnd);
+                }
+            } else if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown) {
+                scroll_delta -= PAGE_SCROLL_STEP;
+            } else if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp) {
+                scroll_delta += PAGE_SCROLL_STEP;
+            }
+        });
+
+        match page_cmd {
+            Some(PageCommand::First) => self.goto_page(0, total_pages),
+            Some(PageCommand::Last) => self.goto_page(total_pages.saturating_sub(1), total_pages),
+            Some(PageCommand::Next) => self.change_page_relative(1, total_pages),
+            Some(PageCommand::Previous) => self.change_page_relative(-1, total_pages),
+            None => {}
+        }
+
+        match selection_cmd {
+            Some(SelectionCommand::Move(delta)) => {
+                self.move_selection_by(page_indices, delta, extend_selection);
+                selection_moved = true;
+            }
+            Some(SelectionCommand::RowStart) => {
+                self.move_selection_row_start(page_indices, columns.max(1), extend_selection);
+                selection_moved = true;
+            }
+            Some(SelectionCommand::RowEnd) => {
+                self.move_selection_row_end(page_indices, columns.max(1), extend_selection);
+                selection_moved = true;
+            }
+            Some(SelectionCommand::First) => {
+                self.move_selection_to_start(page_indices, extend_selection);
+                selection_moved = true;
+            }
+            Some(SelectionCommand::Last) => {
+                self.move_selection_to_end(page_indices, extend_selection);
+                selection_moved = true;
+            }
+            None => {}
+        }
+
+        (scroll_delta, selection_moved)
     }
 }

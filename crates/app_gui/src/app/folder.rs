@@ -63,6 +63,8 @@ impl UiApp {
         self.scanned_count = 0;
         self.total_files = 0;
         self.view = ViewMode::Aanwezig;
+        self.reset_selection();
+        self.current_page = 0;
         self.thumbs.clear();
         self.thumb_keys.clear();
         self.full_images.clear();
