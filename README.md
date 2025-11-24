@@ -136,12 +136,13 @@ CI helper scripts:
 
 ## Contributing
 
-We welcome contributions and feedback! Ideas:
+We welcome contributions and feedback! Ideas (in no particular order):
 
+- The most important contribution comes from just using the app with "Help het model te verbeteren" enabled. This will quickly grow the dataset to train improved model versions. Any usage feedback is also greatly appreciated.
 - macOS testing and PRs that fix issues on Mac
-- Add support for additional OS
 - Add a "stats" tab to summarize/analyze scan results
 - Polish UI/UX and add translations
+- Further optimizing CPU-based inference speed: enabling BLAS backend (mkl/accelerate), batch-level parallelism, batch size auto-tuning.
 
 Before submitting a PR:
 
