@@ -252,10 +252,10 @@ impl UiApp {
 
     /// Shows the context menu that allows manual labeling/export shortcuts.
     pub(super) fn render_context_menu(&mut self, ui: &mut egui::Ui, indices: &[usize]) {
-        ui.menu_button("Exporteren", |ui| {
-            ui.close();
+        if ui.button("Exporteren").clicked() {
             self.export_selected_images(indices);
-        });
+            ui.close();
+        }
         ui.separator();
         if ui.button("Markeer als Achtergrond (Leeg)").clicked() {
             self.assign_manual_category(indices, "achtergrond".into(), false);
