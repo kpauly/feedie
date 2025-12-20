@@ -4,7 +4,7 @@ use crate::export::{CoordinatePrompt, PendingExport};
 use crate::manifest::{ManifestStatus, ModelDownloadStatus};
 use eframe::{App, Frame, egui};
 use feeder_core::ImageInfo;
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -48,6 +48,20 @@ pub(crate) struct LabelOption {
     pub(crate) scientific: Option<String>,
 }
 
+/// Background thumbnail decode request.
+pub(crate) struct ThumbRequest {
+    pub(crate) path: PathBuf,
+    pub(crate) generation: u64,
+}
+
+/// Decoded thumbnail image ready to upload to egui.
+pub(crate) struct ThumbResult {
+    pub(crate) path: PathBuf,
+    pub(crate) generation: u64,
+    pub(crate) size: [usize; 2],
+    pub(crate) pixels: Vec<u8>,
+}
+
 /// Root egui application state that wires together all modules.
 ///
 /// The `UiApp` is owned by `eframe` and persists for the lifetime of the
@@ -75,6 +89,12 @@ pub struct UiApp {
     pub(crate) rx: Option<Receiver<ScanMsg>>,
     pub(crate) thumbs: HashMap<PathBuf, egui::TextureHandle>,
     pub(crate) thumb_keys: VecDeque<PathBuf>,
+    pub(crate) thumb_inflight: HashSet<PathBuf>,
+    pub(crate) thumb_failed: HashSet<PathBuf>,
+    pub(crate) thumb_generation: u64,
+    pub(crate) thumb_req_txs: Vec<Sender<ThumbRequest>>,
+    pub(crate) thumb_req_cursor: usize,
+    pub(crate) thumb_res_rx: Receiver<ThumbResult>,
     pub(crate) full_images: HashMap<PathBuf, egui::TextureHandle>,
     pub(crate) full_keys: VecDeque<PathBuf>,
     pub(crate) selected_indices: BTreeSet<usize>,
@@ -121,6 +141,7 @@ impl UiApp {
         let (model_root, model_version) = Self::prepare_model_dir();
         let label_options = Self::load_label_options_from(&model_root.join("feeder-labels.csv"));
         let (upload_status_tx, upload_status_rx) = std::sync::mpsc::channel();
+        let (thumb_req_txs, thumb_res_rx) = thumbnails::spawn_thumbnail_worker();
         Self {
             gekozen_map: None,
             rijen: Vec::new(),
@@ -134,6 +155,12 @@ impl UiApp {
             rx: None,
             thumbs: HashMap::new(),
             thumb_keys: VecDeque::new(),
+            thumb_inflight: HashSet::new(),
+            thumb_failed: HashSet::new(),
+            thumb_generation: 0,
+            thumb_req_txs,
+            thumb_req_cursor: 0,
+            thumb_res_rx,
             full_images: HashMap::new(),
             full_keys: VecDeque::new(),
             selected_indices: BTreeSet::new(),
@@ -181,8 +208,8 @@ pub(crate) const THUMB_SIZE: u32 = 120;
 pub(crate) const MAX_THUMBS: usize = 256;
 /// Maximum number of full resolution textures cached for the preview window.
 pub(crate) const MAX_FULL_IMAGES: usize = 32;
-/// Hard limit to avoid decoding too many thumbnails per frame.
-pub(crate) const MAX_THUMB_LOAD_PER_FRAME: usize = 12;
+/// Hard limit to avoid uploading too many thumbnails per frame.
+pub(crate) const MAX_THUMB_APPLY_PER_FRAME: usize = 12;
 /// Width allocated for a thumbnail card.
 pub(crate) const CARD_WIDTH: f32 = THUMB_SIZE as f32 + 40.0;
 /// Height allocated for a thumbnail card.

@@ -116,8 +116,7 @@ impl UiApp {
         self.scan_in_progress = false;
         self.current_page = 0;
         self.status = format!("Gereed: cache geladen ({})", cached.model_version);
-        self.thumbs.clear();
-        self.thumb_keys.clear();
+        self.reset_thumbnail_cache();
         self.full_images.clear();
         self.full_keys.clear();
         self.reset_selection();

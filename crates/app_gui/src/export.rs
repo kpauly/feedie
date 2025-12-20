@@ -6,7 +6,7 @@ use crate::util::{
     canonical_label, extract_timestamp, fallback_display_label, next_available_export_path,
     parse_coordinates, sanitize_for_path,
 };
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use arboard::Clipboard;
 use chrono::{DateTime, Local};
 use eframe::egui;

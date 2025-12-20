@@ -1,8 +1,6 @@
 //! Rendering of the results grid and associated interactions.
 
-use super::{
-    CARD_HEIGHT, CARD_WIDTH, MAX_THUMB_LOAD_PER_FRAME, PAGE_SIZE, THUMB_SIZE, UiApp, ViewMode,
-};
+use super::{CARD_HEIGHT, CARD_WIDTH, PAGE_SIZE, THUMB_SIZE, UiApp, ViewMode};
 use eframe::egui;
 use feeder_core::{Decision, ImageInfo};
 
@@ -46,10 +44,8 @@ impl UiApp {
     pub(super) fn draw_thumbnail_card(
         &mut self,
         ui: &mut egui::Ui,
-        ctx: &egui::Context,
         idx: usize,
         is_selected: bool,
-        loaded_this_frame: &mut usize,
     ) -> (egui::Response, egui::Rect) {
         let (file_path, file_label, caption) = {
             let info = &self.rijen[idx];
@@ -88,16 +84,7 @@ impl UiApp {
         child.label(egui::RichText::new(file_label.clone()).small());
         child.add_space(4.0);
 
-        let had_tex = self.thumbs.contains_key(&file_path);
-        let tex_id = if had_tex || *loaded_this_frame < MAX_THUMB_LOAD_PER_FRAME {
-            let tex = self.get_or_load_thumb(ctx, &file_path);
-            if tex.is_some() && !had_tex {
-                *loaded_this_frame += 1;
-            }
-            tex
-        } else {
-            None
-        };
+        let tex_id = self.thumb_texture_id(&file_path);
         let image_size = egui::Vec2::splat(THUMB_SIZE as f32);
         if let Some(id) = tex_id {
             child.add(
@@ -157,22 +144,19 @@ impl UiApp {
             );
             if present_btn.clicked() {
                 self.view = ViewMode::Aanwezig;
-                self.thumbs.clear();
-                self.thumb_keys.clear();
+                self.reset_thumbnail_cache();
                 self.reset_selection();
                 self.current_page = 0;
             }
             if empty_btn.clicked() {
                 self.view = ViewMode::Leeg;
-                self.thumbs.clear();
-                self.thumb_keys.clear();
+                self.reset_thumbnail_cache();
                 self.reset_selection();
                 self.current_page = 0;
             }
             if unsure_btn.clicked() {
                 self.view = ViewMode::Onzeker;
-                self.thumbs.clear();
-                self.thumb_keys.clear();
+                self.reset_thumbnail_cache();
                 self.reset_selection();
                 self.current_page = 0;
             }
@@ -204,8 +188,29 @@ impl UiApp {
         if filtered.is_empty() {
             ui.label("Geen frames om te tonen in deze weergave.");
         } else {
+            self.queue_thumbnails_for_indices(page_indices);
+            if self.current_page + 1 < total_pages {
+                let next_page = self.current_page + 1;
+                let start = next_page * PAGE_SIZE;
+                let end = (start + PAGE_SIZE).min(filtered.len());
+                self.queue_thumbnails_for_indices(&filtered[start..end]);
+            }
+            let mut loaded_on_page = 0usize;
+            for &idx in page_indices {
+                if let Some(info) = self.rijen.get(idx)
+                    && self.thumbs.contains_key(&info.file)
+                {
+                    loaded_on_page += 1;
+                }
+            }
             ui.add_space(6.0);
             self.render_page_controls(ui, total_pages);
+            if loaded_on_page < page_indices.len() {
+                ui.label(format!(
+                    "Thumbnails laden: {loaded_on_page} / {}",
+                    page_indices.len()
+                ));
+            }
             ui.add_space(4.0);
             egui::ScrollArea::vertical()
                 .auto_shrink([false; 2])
@@ -213,18 +218,11 @@ impl UiApp {
                     if scroll_delta.abs() > f32::EPSILON {
                         ui.scroll_with_delta(egui::vec2(0.0, scroll_delta));
                     }
-                    let mut loaded_this_frame = 0usize;
                     let mut target_rect: Option<egui::Rect> = None;
                     ui.horizontal_wrapped(|ui| {
                         for &idx in page_indices {
                             let is_selected = self.selected_indices.contains(&idx);
-                            let (response, rect) = self.draw_thumbnail_card(
-                                ui,
-                                ctx,
-                                idx,
-                                is_selected,
-                                &mut loaded_this_frame,
-                            );
+                            let (response, rect) = self.draw_thumbnail_card(ui, idx, is_selected);
                             if Some(idx) == target_focus {
                                 target_rect = Some(rect);
                             }

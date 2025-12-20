@@ -12,8 +12,9 @@ impl UiApp {
         }
         self.poll_manifest_updates();
         self.poll_model_download();
+        self.poll_thumbnail_results(ctx);
         self.drain_scan_channel();
-        if self.scan_in_progress || self.rx.is_some() {
+        if self.scan_in_progress || self.rx.is_some() || !self.thumb_inflight.is_empty() {
             ctx.request_repaint();
             ctx.request_repaint_after(Duration::from_millis(16));
         }
@@ -117,8 +118,7 @@ impl UiApp {
                         self.has_scanned = true;
                         self.rijen = rows;
                         self.current_page = 0;
-                        self.thumbs.clear();
-                        self.thumb_keys.clear();
+                        self.reset_thumbnail_cache();
                         self.presence_threshold = self.pending_presence_threshold;
                         self.apply_presence_threshold();
                         self.reset_selection();
