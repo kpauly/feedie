@@ -9,43 +9,52 @@ use std::path::Path;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread;
 
-pub(super) fn spawn_thumbnail_worker() -> (Sender<ThumbRequest>, Receiver<ThumbResult>) {
-    let (req_tx, req_rx) = mpsc::channel::<ThumbRequest>();
+pub(super) fn spawn_thumbnail_worker() -> (Vec<Sender<ThumbRequest>>, Receiver<ThumbResult>) {
     let (res_tx, res_rx) = mpsc::channel::<ThumbResult>();
+    let workers = thread::available_parallelism()
+        .map(|count| count.get())
+        .unwrap_or(2)
+        .clamp(1, 4);
+    let mut senders = Vec::with_capacity(workers);
 
-    thread::spawn(move || {
-        for request in req_rx {
-            let result = match image::open(&request.path) {
-                Ok(img) => {
-                    let rgba = img.to_rgba8();
-                    let thumb = image::imageops::thumbnail(&rgba, THUMB_SIZE, THUMB_SIZE);
-                    let (w, h) = thumb.dimensions();
-                    ThumbResult {
-                        path: request.path,
-                        generation: request.generation,
-                        size: [w as usize, h as usize],
-                        pixels: thumb.into_raw(),
+    for _ in 0..workers {
+        let (req_tx, req_rx) = mpsc::channel::<ThumbRequest>();
+        let res_tx = res_tx.clone();
+        thread::spawn(move || {
+            for request in req_rx {
+                let result = match image::open(&request.path) {
+                    Ok(img) => {
+                        let rgba = img.to_rgba8();
+                        let thumb = image::imageops::thumbnail(&rgba, THUMB_SIZE, THUMB_SIZE);
+                        let (w, h) = thumb.dimensions();
+                        ThumbResult {
+                            path: request.path,
+                            generation: request.generation,
+                            size: [w as usize, h as usize],
+                            pixels: thumb.into_raw(),
+                        }
                     }
-                }
-                Err(err) => {
-                    tracing::warn!(
-                        "Failed to load thumbnail for {}: {}",
-                        request.path.display(),
-                        err
-                    );
-                    ThumbResult {
-                        path: request.path,
-                        generation: request.generation,
-                        size: [0, 0],
-                        pixels: Vec::new(),
+                    Err(err) => {
+                        tracing::warn!(
+                            "Failed to load thumbnail for {}: {}",
+                            request.path.display(),
+                            err
+                        );
+                        ThumbResult {
+                            path: request.path,
+                            generation: request.generation,
+                            size: [0, 0],
+                            pixels: Vec::new(),
+                        }
                     }
-                }
-            };
-            let _ = res_tx.send(result);
-        }
-    });
+                };
+                let _ = res_tx.send(result);
+            }
+        });
+        senders.push(req_tx);
+    }
 
-    (req_tx, res_rx)
+    (senders, res_rx)
 }
 
 impl UiApp {
@@ -118,7 +127,13 @@ impl UiApp {
             path: path.to_path_buf(),
             generation: self.thumb_generation,
         };
-        if self.thumb_req_tx.send(request).is_err() {
+        if self.thumb_req_txs.is_empty() {
+            self.thumb_inflight.remove(path);
+            return;
+        }
+        let idx = self.thumb_req_cursor % self.thumb_req_txs.len();
+        self.thumb_req_cursor = (idx + 1) % self.thumb_req_txs.len();
+        if self.thumb_req_txs[idx].send(request).is_err() {
             self.thumb_inflight.remove(path);
         }
     }

@@ -92,7 +92,8 @@ pub struct UiApp {
     pub(crate) thumb_inflight: HashSet<PathBuf>,
     pub(crate) thumb_failed: HashSet<PathBuf>,
     pub(crate) thumb_generation: u64,
-    pub(crate) thumb_req_tx: Sender<ThumbRequest>,
+    pub(crate) thumb_req_txs: Vec<Sender<ThumbRequest>>,
+    pub(crate) thumb_req_cursor: usize,
     pub(crate) thumb_res_rx: Receiver<ThumbResult>,
     pub(crate) full_images: HashMap<PathBuf, egui::TextureHandle>,
     pub(crate) full_keys: VecDeque<PathBuf>,
@@ -140,7 +141,7 @@ impl UiApp {
         let (model_root, model_version) = Self::prepare_model_dir();
         let label_options = Self::load_label_options_from(&model_root.join("feeder-labels.csv"));
         let (upload_status_tx, upload_status_rx) = std::sync::mpsc::channel();
-        let (thumb_req_tx, thumb_res_rx) = thumbnails::spawn_thumbnail_worker();
+        let (thumb_req_txs, thumb_res_rx) = thumbnails::spawn_thumbnail_worker();
         Self {
             gekozen_map: None,
             rijen: Vec::new(),
@@ -157,7 +158,8 @@ impl UiApp {
             thumb_inflight: HashSet::new(),
             thumb_failed: HashSet::new(),
             thumb_generation: 0,
-            thumb_req_tx,
+            thumb_req_txs,
+            thumb_req_cursor: 0,
             thumb_res_rx,
             full_images: HashMap::new(),
             full_keys: VecDeque::new(),
