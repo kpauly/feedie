@@ -65,8 +65,7 @@ impl UiApp {
         self.view = ViewMode::Aanwezig;
         self.reset_selection();
         self.current_page = 0;
-        self.thumbs.clear();
-        self.thumb_keys.clear();
+        self.reset_thumbnail_cache();
         self.full_images.clear();
         self.full_keys.clear();
         match scan_folder_with(&dir, ScanOptions { recursive: false }) {
