@@ -1,4 +1,4 @@
-﻿# Traducciones en español
+# Traducciones en español
 
 nav-photo-folder = Carpeta de fotos
 nav-results = Resultados

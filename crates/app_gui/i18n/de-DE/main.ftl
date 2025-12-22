@@ -1,4 +1,4 @@
-﻿# Deutsche ?bersetzungen
+# Deutsche ?bersetzungen
 
 nav-photo-folder = Fotoordner
 nav-results = Ergebnisse

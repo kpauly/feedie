@@ -1,4 +1,4 @@
-﻿# Svenska översättningar
+# Svenska översättningar
 
 nav-photo-folder = Fotomapp
 nav-results = Resultat

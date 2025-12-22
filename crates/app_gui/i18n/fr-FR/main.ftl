@@ -1,4 +1,4 @@
-﻿# Traductions françaises
+# Traductions françaises
 
 nav-photo-folder = Dossier photo
 nav-results = Résultats
