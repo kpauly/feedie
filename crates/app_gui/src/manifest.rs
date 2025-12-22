@@ -77,8 +77,10 @@ impl UiApp {
                 Ok(Err(err)) => self.manifest_status = ManifestStatus::Error(err),
                 Err(TryRecvError::Empty) => self.update_rx = Some(rx),
                 Err(TryRecvError::Disconnected) => {
-                    self.manifest_status =
-                        ManifestStatus::Error("Zoeken naar updates is mislukt".to_string());
+                    self.manifest_status = ManifestStatus::Error(
+                        self.tr("Zoeken naar updates is mislukt", "Update check failed")
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -117,19 +119,25 @@ impl UiApp {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(6.0);
-        ui.heading("Updates");
+        ui.heading(self.tr("Updates", "Updates"));
         match &self.manifest_status {
             ManifestStatus::Idle => {
-                if ui.button("Controleer op updates").clicked() {
+                if ui
+                    .button(self.tr("Controleer op updates", "Check for updates"))
+                    .clicked()
+                {
                     self.request_manifest_refresh();
                 }
             }
             ManifestStatus::Checking => {
-                ui.label("Zoeken naar updates...");
+                ui.label(self.tr("Zoeken naar updates...", "Checking for updates..."));
             }
             ManifestStatus::Error(err) => {
                 ui.colored_label(egui::Color32::RED, err);
-                if ui.button("Opnieuw proberen").clicked() {
+                if ui
+                    .button(self.tr("Opnieuw proberen", "Try again"))
+                    .clicked()
+                {
                     self.request_manifest_refresh();
                 }
             }
@@ -137,32 +145,50 @@ impl UiApp {
                 let summary = summary.clone();
                 if summary.app_update_available {
                     ui.label(format!(
-                        "Nieuwe app-versie beschikbaar: {}",
+                        "{}: {}",
+                        self.tr("Nieuwe app-versie beschikbaar", "New app version available"),
                         summary.latest_app
                     ));
-                    ui.hyperlink_to("Open downloadpagina", &summary.app_url);
+                    ui.hyperlink_to(
+                        self.tr("Open downloadpagina", "Open download page"),
+                        &summary.app_url,
+                    );
                 } else {
-                    ui.label("Je gebruikt de nieuwste app-versie.");
+                    ui.label(self.tr(
+                        "Je gebruikt de nieuwste app-versie.",
+                        "You are using the latest app version.",
+                    ));
                 }
                 ui.add_space(4.0);
                 if summary.model_update_available {
                     ui.label(format!(
-                        "Nieuw herkenningsmodel beschikbaar: {}",
+                        "{}: {}",
+                        self.tr("Nieuw herkenningsmodel beschikbaar", "New model available"),
                         summary.latest_model
                     ));
                     if let Some(size) = summary.model_size_mb {
-                        ui.label(format!("Geschatte downloadgrootte: {:.1} MB", size));
+                        ui.label(format!(
+                            "{}: {:.1} MB",
+                            self.tr("Geschatte downloadgrootte", "Estimated download size"),
+                            size
+                        ));
                     }
                     if let Some(notes) = &summary.model_notes {
                         ui.label(notes);
                     }
                     self.render_model_download_actions(ui, &summary);
                 } else {
-                    ui.label("Herkenningsmodel is up-to-date.");
+                    ui.label(self.tr(
+                        "Herkenningsmodel is up-to-date.",
+                        "Recognition model is up to date.",
+                    ));
                     self.render_model_download_feedback(ui);
                 }
                 ui.add_space(6.0);
-                if ui.button("Opnieuw controleren").clicked() {
+                if ui
+                    .button(self.tr("Opnieuw controleren", "Check again"))
+                    .clicked()
+                {
                     self.request_manifest_refresh();
                 }
             }
@@ -177,22 +203,34 @@ impl UiApp {
     ) {
         match &self.model_download_status {
             ModelDownloadStatus::Idle => {
-                if ui.button("Download en installeren").clicked() {
+                if ui
+                    .button(self.tr("Download en installeren", "Download and install"))
+                    .clicked()
+                {
                     self.start_model_download(summary);
                 }
             }
             ModelDownloadStatus::Downloading => {
-                ui.label("Modelupdate wordt gedownload...");
+                ui.label(self.tr(
+                    "Modelupdate wordt gedownload...",
+                    "Downloading model update...",
+                ));
             }
             ModelDownloadStatus::Error(err) => {
                 ui.colored_label(egui::Color32::RED, err);
-                if ui.button("Opnieuw downloaden").clicked() {
+                if ui
+                    .button(self.tr("Opnieuw downloaden", "Download again"))
+                    .clicked()
+                {
                     self.start_model_download(summary);
                 }
             }
             ModelDownloadStatus::Success(msg) => {
                 ui.label(msg);
-                if ui.button("Download opnieuw").clicked() {
+                if ui
+                    .button(self.tr("Download opnieuw", "Download again"))
+                    .clicked()
+                {
                     self.start_model_download(summary);
                 }
             }
@@ -203,10 +241,16 @@ impl UiApp {
     pub(crate) fn render_model_download_feedback(&self, ui: &mut egui::Ui) {
         match &self.model_download_status {
             ModelDownloadStatus::Idle => {
-                ui.label("Geen recente modeldownloads uitgevoerd.");
+                ui.label(self.tr(
+                    "Geen recente modeldownloads uitgevoerd.",
+                    "No recent model downloads.",
+                ));
             }
             ModelDownloadStatus::Downloading => {
-                ui.label("Modeldownload wordt uitgevoerd...");
+                ui.label(self.tr(
+                    "Modeldownload wordt uitgevoerd...",
+                    "Model download in progress...",
+                ));
             }
             ModelDownloadStatus::Error(err) => {
                 ui.colored_label(egui::Color32::RED, err);
@@ -243,7 +287,8 @@ impl UiApp {
                 Ok(Ok(version)) => {
                     let normalized = normalize_model_version(&version);
                     self.model_download_status = ModelDownloadStatus::Success(format!(
-                        "Model {normalized} ge\u{EB}nstalleerd."
+                        "{} {normalized}.",
+                        self.tr("Model geinstalleerd", "Model installed")
                     ));
                     self.model_version = read_model_version_from(&self.model_version_path());
                     self.label_options = Self::load_label_options_from(&self.labels_path());
@@ -256,8 +301,10 @@ impl UiApp {
                     self.model_download_rx = Some(rx);
                 }
                 Err(TryRecvError::Disconnected) => {
-                    self.model_download_status =
-                        ModelDownloadStatus::Error("Downloadkanaal verbroken".to_string());
+                    self.model_download_status = ModelDownloadStatus::Error(
+                        self.tr("Downloadkanaal verbroken", "Download channel closed")
+                            .to_string(),
+                    );
                 }
             }
         }

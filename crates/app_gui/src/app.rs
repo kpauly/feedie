@@ -1,7 +1,10 @@
 //! Core application state for the Feedie GUI.
 
 use crate::export::{CoordinatePrompt, PendingExport};
+use crate::i18n::{Language, LanguagePreference};
 use crate::manifest::{ManifestStatus, ModelDownloadStatus};
+use crate::settings_store::{AppSettings, load_settings, save_settings};
+use crate::util::canonical_label;
 use eframe::{App, Frame, egui};
 use feeder_core::ImageInfo;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
@@ -45,6 +48,7 @@ pub(crate) enum Panel {
 pub(crate) struct LabelOption {
     pub(crate) canonical: String,
     pub(crate) display: String,
+    pub(crate) display_en: Option<String>,
     pub(crate) scientific: Option<String>,
 }
 
@@ -104,7 +108,6 @@ pub struct UiApp {
     pub(crate) presence_threshold: f32,
     pub(crate) pending_presence_threshold: f32,
     pub(crate) batch_size: usize,
-    pub(crate) background_labels_input: String,
     pub(crate) background_labels: Vec<String>,
     pub(crate) preview: Option<PreviewState>,
     pub(crate) label_options: Vec<LabelOption>,
@@ -126,6 +129,8 @@ pub struct UiApp {
     pub(crate) roboflow_dataset_input: String,
     pub(crate) upload_status_tx: Sender<String>,
     pub(crate) upload_status_rx: Receiver<String>,
+    pub(crate) language_preference: LanguagePreference,
+    pub(crate) language: Language,
 }
 
 impl UiApp {
@@ -142,6 +147,9 @@ impl UiApp {
         let label_options = Self::load_label_options_from(&model_root.join("feeder-labels.csv"));
         let (upload_status_tx, upload_status_rx) = std::sync::mpsc::channel();
         let (thumb_req_txs, thumb_res_rx) = thumbnails::spawn_thumbnail_worker();
+        let settings = load_settings();
+        let language = settings.language.resolve();
+        let background_labels = Self::normalize_background_labels(settings.background_labels);
         Self {
             gekozen_map: None,
             rijen: Vec::new(),
@@ -170,8 +178,7 @@ impl UiApp {
             presence_threshold: 0.5,
             pending_presence_threshold: 0.5,
             batch_size: 8,
-            background_labels_input: "Achtergrond".to_string(),
-            background_labels: vec!["achtergrond".to_string()],
+            background_labels,
             preview: None,
             label_options,
             new_label_buffer: String::new(),
@@ -192,6 +199,8 @@ impl UiApp {
             roboflow_dataset_input: "voederhuiscamera".to_string(),
             upload_status_tx,
             upload_status_rx,
+            language_preference: settings.language,
+            language,
         }
     }
 }
@@ -199,6 +208,63 @@ impl UiApp {
 impl Default for UiApp {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl UiApp {
+    pub(crate) fn update_language_preference(&mut self, preference: LanguagePreference) {
+        self.language_preference = preference;
+        self.language = preference.resolve();
+        self.persist_settings();
+    }
+
+    pub(crate) fn update_background_labels(&mut self, labels: Vec<String>) {
+        let normalized = Self::normalize_background_labels(labels);
+        if normalized == self.background_labels {
+            return;
+        }
+        self.background_labels = normalized;
+        self.apply_presence_threshold();
+        self.save_cache_for_current_folder();
+        self.persist_settings();
+    }
+
+    fn persist_settings(&self) {
+        let settings = AppSettings {
+            language: self.language_preference,
+            background_labels: self.background_labels.clone(),
+        };
+        if let Err(err) = save_settings(&settings) {
+            tracing::warn!("Instellingen konden niet worden opgeslagen: {err}");
+        }
+    }
+
+    fn normalize_background_labels(labels: Vec<String>) -> Vec<String> {
+        let mut seen = HashSet::new();
+        let mut normalized = Vec::new();
+        for label in labels {
+            let canonical = canonical_label(&label);
+            if canonical.is_empty() {
+                continue;
+            }
+            if canonical != BACKGROUND_LABEL && canonical != SOMETHING_LABEL {
+                continue;
+            }
+            if seen.insert(canonical.clone()) {
+                normalized.push(canonical);
+            }
+        }
+        if !seen.contains(BACKGROUND_LABEL) {
+            normalized.insert(0, BACKGROUND_LABEL.to_string());
+        }
+        normalized
+    }
+
+    pub(crate) fn tr(&self, nl: &'static str, en: &'static str) -> &'static str {
+        match self.language {
+            Language::Dutch => nl,
+            Language::English => en,
+        }
     }
 }
 
@@ -224,6 +290,10 @@ pub(crate) const MANIFEST_URL: &str = "https://github.com/kpauly/feedie/raw/main
 pub(crate) const MODEL_FILE_NAME: &str = "feeder-efficientvit-m0.safetensors";
 /// Name of the CSV file containing labels.
 pub(crate) const LABEL_FILE_NAME: &str = "feeder-labels.csv";
+/// Canonical background label.
+pub(crate) const BACKGROUND_LABEL: &str = "achtergrond";
+/// Canonical "something sp." label.
+pub(crate) const SOMETHING_LABEL: &str = "iets sp";
 /// Name of the on-disk file that stores the model version that was installed.
 pub(crate) const VERSION_FILE_NAME: &str = "model_version.txt";
 

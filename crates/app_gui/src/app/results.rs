@@ -28,15 +28,17 @@ impl UiApp {
             Some(classification) => {
                 let mut label = match &classification.decision {
                     Decision::Label(name) => self.display_for(name),
-                    Decision::Unknown => "Leeg".to_string(),
+                    Decision::Unknown => self.tr("Leeg", "Empty").to_string(),
                 };
                 if matches!(&classification.decision, Decision::Label(name) if name.ends_with(" (manueel)"))
                 {
-                    label.push_str(" (manueel)");
+                    label.push_str(self.tr(" (manueel)", " (manual)"));
                 }
                 format!("{label} ({:.1}%)", classification.confidence * 100.0)
             }
-            None => "Geen classificatie".to_string(),
+            None => self
+                .tr("Geen classificatie", "No classification")
+                .to_string(),
         }
     }
 
@@ -122,11 +124,11 @@ impl UiApp {
             return;
         }
         if !self.has_scanned {
-            ui.label("Nog geen scan uitgevoerd.");
+            ui.label(self.tr("Nog geen scan uitgevoerd.", "No scan has been run yet."));
             return;
         }
         if self.rijen.is_empty() {
-            ui.label("Geen resultaten beschikbaar.");
+            ui.label(self.tr("Geen resultaten beschikbaar.", "No results available."));
             return;
         }
 
@@ -134,13 +136,15 @@ impl UiApp {
         ui.horizontal(|ui| {
             let present_btn = ui.selectable_label(
                 self.view == ViewMode::Aanwezig,
-                format!("Aanwezig ({count_present})"),
+                format!("{} ({count_present})", self.tr("Aanwezig", "Present")),
             );
-            let empty_btn =
-                ui.selectable_label(self.view == ViewMode::Leeg, format!("Leeg ({count_empty})"));
+            let empty_btn = ui.selectable_label(
+                self.view == ViewMode::Leeg,
+                format!("{} ({count_empty})", self.tr("Leeg", "Empty")),
+            );
             let unsure_btn = ui.selectable_label(
                 self.view == ViewMode::Onzeker,
-                format!("Onzeker ({count_unsure})"),
+                format!("{} ({count_unsure})", self.tr("Onzeker", "Uncertain")),
             );
             if present_btn.clicked() {
                 self.view = ViewMode::Aanwezig;
@@ -186,7 +190,10 @@ impl UiApp {
         };
 
         if filtered.is_empty() {
-            ui.label("Geen frames om te tonen in deze weergave.");
+            ui.label(self.tr(
+                "Geen frames om te tonen in deze weergave.",
+                "No frames to show in this view.",
+            ));
         } else {
             self.queue_thumbnails_for_indices(page_indices);
             if self.current_page + 1 < total_pages {
@@ -207,7 +214,8 @@ impl UiApp {
             self.render_page_controls(ui, total_pages);
             if loaded_on_page < page_indices.len() {
                 ui.label(format!(
-                    "Thumbnails laden: {loaded_on_page} / {}",
+                    "{}: {loaded_on_page} / {}",
+                    self.tr("Thumbnails laden", "Loading thumbnails"),
                     page_indices.len()
                 ));
             }
@@ -250,16 +258,28 @@ impl UiApp {
 
     /// Shows the context menu that allows manual labeling/export shortcuts.
     pub(super) fn render_context_menu(&mut self, ui: &mut egui::Ui, indices: &[usize]) {
-        if ui.button("Exporteren").clicked() {
+        if ui.button(self.tr("Exporteren", "Export")).clicked() {
             self.export_selected_images(indices);
             ui.close();
         }
         ui.separator();
-        if ui.button("Markeer als Achtergrond (Leeg)").clicked() {
+        if ui
+            .button(self.tr(
+                "Markeer als Achtergrond (Leeg)",
+                "Mark as Background (Empty)",
+            ))
+            .clicked()
+        {
             self.assign_manual_category(indices, "achtergrond".into(), false);
             ui.close();
         }
-        if ui.button("Markeer als Iets sp. (Onzeker)").clicked() {
+        if ui
+            .button(self.tr(
+                "Markeer als Iets sp. (Onzeker)",
+                "Mark as Something sp. (Uncertain)",
+            ))
+            .clicked()
+        {
             self.assign_manual_category(indices, "iets sp".into(), false);
             ui.close();
         }
@@ -272,12 +292,17 @@ impl UiApp {
             }
         }
         ui.separator();
-        ui.menu_button("Nieuw...", |ui| {
-            ui.label("Vul een nieuwe soortnaam in:");
+        let new_menu_label = self.tr("Nieuw...", "New...");
+        ui.menu_button(new_menu_label, |ui| {
+            let new_label_prompt =
+                self.tr("Vul een nieuwe soortnaam in:", "Enter a new species name:");
+            ui.label(new_label_prompt);
             ui.horizontal(|ui| {
+                let new_label_hint = self.tr("Nieuwe soort", "New species");
+                let ok_label = self.tr("OK", "OK");
                 let resp = ui.add(
                     egui::TextEdit::singleline(&mut self.new_label_buffer)
-                        .hint_text("Nieuwe soort"),
+                        .hint_text(new_label_hint),
                 );
                 resp.request_focus();
                 let mut submit = false;
@@ -287,7 +312,7 @@ impl UiApp {
                 {
                     submit = true;
                 }
-                if ui.button("OK").clicked() {
+                if ui.button(ok_label).clicked() {
                     submit = true;
                 }
                 if submit && self.apply_new_label(indices) {
@@ -312,7 +337,12 @@ impl UiApp {
     fn render_page_controls(&mut self, ui: &mut egui::Ui, total_pages: usize) {
         ui.horizontal(|ui| {
             let current = self.current_page;
-            let label = format!("Pagina {} | {}", current + 1, total_pages);
+            let label = format!(
+                "{} {} | {}",
+                self.tr("Pagina", "Page"),
+                current + 1,
+                total_pages
+            );
             if ui
                 .add_enabled(current > 0, egui::Button::new("<<"))
                 .clicked()

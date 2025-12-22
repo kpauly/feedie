@@ -13,14 +13,25 @@ impl UiApp {
     /// Displays the folder selection UI and scan controls.
     pub(super) fn render_folder_panel(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
         if let Some(path) = &self.gekozen_map {
-            ui.label(format!("Fotomap: {}", path.display()));
-            ui.label(format!("Afbeeldingen in deze map: {}", self.total_files));
+            ui.label(format!(
+                "{}: {}",
+                self.tr("Fotomap", "Photo folder"),
+                path.display()
+            ));
+            ui.label(format!(
+                "{}: {}",
+                self.tr("Afbeeldingen in deze map", "Images in this folder"),
+                self.total_files
+            ));
         } else {
-            ui.label("Geen fotomap geselecteerd.");
+            ui.label(self.tr("Geen fotomap geselecteerd.", "No photo folder selected."));
         }
         ui.add_space(8.0);
         if ui
-            .add_enabled(!self.scan_in_progress, egui::Button::new("Map kiezen..."))
+            .add_enabled(
+                !self.scan_in_progress,
+                egui::Button::new(self.tr("Map kiezen...", "Choose folder...")),
+            )
             .clicked()
             && let Some(dir) = FileDialog::new().set_directory(".").pick_folder()
         {
@@ -28,7 +39,7 @@ impl UiApp {
         }
         let can_scan = self.gekozen_map.is_some() && !self.scan_in_progress;
         if ui
-            .add_enabled(can_scan, egui::Button::new("Scannen"))
+            .add_enabled(can_scan, egui::Button::new(self.tr("Scannen", "Scan")))
             .clicked()
             && let Some(dir) = self.gekozen_map.clone()
         {
@@ -46,7 +57,8 @@ impl UiApp {
         let total = self.total_files.max(1);
         let frac = (self.scanned_count as f32) / (total as f32);
         ui.add(egui::ProgressBar::new(frac).text(format!(
-            "Scannen... {} / {} ({:.0}%)",
+            "{}... {} / {} ({:.0}%)",
+            self.tr("Scannen", "Scanning"),
             self.scanned_count,
             self.total_files,
             frac * 100.0
@@ -82,7 +94,10 @@ impl UiApp {
                 }
             }
             Err(e) => {
-                self.status = format!("Fout bij lezen van map: {e}");
+                self.status = format!(
+                    "{}: {e}",
+                    self.tr("Fout bij lezen van map", "Failed to read folder")
+                );
             }
         }
     }
@@ -90,18 +105,26 @@ impl UiApp {
     /// Kicks off an asynchronous scan job for the selected folder.
     pub(super) fn start_scan(&mut self, dir: PathBuf) {
         self.scan_in_progress = true;
-        self.status = "Bezig met scannen...".to_string();
+        self.status = self.tr("Bezig met scannen...", "Scanning...").to_string();
         self.scanned_count = 0;
         self.panel = Panel::Results;
         let (tx, rx): (Sender<ScanMsg>, Receiver<ScanMsg>) = mpsc::channel();
         self.rx = Some(rx);
         let cfg = self.classifier_config();
+        let language = self.language;
         thread::spawn(move || {
             let t0 = Instant::now();
             let mut rows = match scan_folder_with(&dir, ScanOptions { recursive: false }) {
                 Ok(r) => r,
                 Err(e) => {
-                    let _ = tx.send(ScanMsg::Error(format!("Map scannen mislukt: {e}")));
+                    let _ = tx.send(ScanMsg::Error(format!(
+                        "{}: {e}",
+                        crate::i18n::tr_for(
+                            language,
+                            "Map scannen mislukt",
+                            "Failed to scan folder"
+                        )
+                    )));
                     tracing::warn!("scan_folder_with failed: {}", e);
                     return;
                 }
@@ -111,7 +134,14 @@ impl UiApp {
             let classifier = match EfficientVitClassifier::new(&cfg) {
                 Ok(c) => c,
                 Err(e) => {
-                    let _ = tx.send(ScanMsg::Error(format!("Model laden mislukt: {e}")));
+                    let _ = tx.send(ScanMsg::Error(format!(
+                        "{}: {e}",
+                        crate::i18n::tr_for(
+                            language,
+                            "Model laden mislukt",
+                            "Failed to load model"
+                        )
+                    )));
                     return;
                 }
             };
@@ -119,7 +149,10 @@ impl UiApp {
             if let Err(e) = classifier.classify_with_progress(&mut rows, |done, total| {
                 let _ = tx_progress.send(ScanMsg::Progress(done.min(total), total));
             }) {
-                let _ = tx.send(ScanMsg::Error(format!("Classificatie mislukt: {e}")));
+                let _ = tx.send(ScanMsg::Error(format!(
+                    "{}: {e}",
+                    crate::i18n::tr_for(language, "Classificatie mislukt", "Classification failed")
+                )));
                 return;
             }
 

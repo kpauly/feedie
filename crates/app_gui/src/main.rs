@@ -3,9 +3,11 @@
 
 mod app;
 mod export;
+mod i18n;
 mod manifest;
 mod model;
 mod roboflow;
+mod settings_store;
 mod util;
 
 use app::UiApp;

@@ -1,11 +1,13 @@
 //! Model installation helpers and confidence heuristics.
 
-use crate::app::{LABEL_FILE_NAME, LabelOption, MODEL_FILE_NAME, UiApp, VERSION_FILE_NAME};
+use crate::app::{
+    LABEL_FILE_NAME, LabelOption, MODEL_FILE_NAME, SOMETHING_LABEL, UiApp, VERSION_FILE_NAME,
+};
 use crate::util::canonical_label;
 use anyhow::{Context, anyhow};
 use directories_next::ProjectDirs;
 use feeder_core::{ClassifierConfig, Decision, ImageInfo};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -19,8 +21,8 @@ impl UiApp {
             if let Some(classification) = &info.classification {
                 match &classification.decision {
                     Decision::Label(name) => {
-                        let lower = name.to_ascii_lowercase();
-                        if !backgrounds.iter().any(|bg| bg == &lower) {
+                        let canonical = canonical_label(name);
+                        if !backgrounds.iter().any(|bg| bg == &canonical) {
                             present = classification.confidence >= threshold;
                         }
                     }
@@ -43,34 +45,16 @@ impl UiApp {
         };
         match &classification.decision {
             Decision::Label(name) => {
-                let lower = canonical_label(name);
-                if lower == "iets sp" {
-                    return true;
+                let canonical = canonical_label(name);
+                if canonical == SOMETHING_LABEL {
+                    return !self.is_background_label(&canonical);
                 }
-                if self.is_background_label(&lower) {
+                if self.is_background_label(&canonical) {
                     return false;
                 }
                 classification.confidence < self.presence_threshold
             }
             Decision::Unknown => false,
-        }
-    }
-
-    /// Updates the cached background labels from the comma separated text input.
-    pub(crate) fn sync_background_labels(&mut self) {
-        let parsed: Vec<String> = self
-            .background_labels_input
-            .split(',')
-            .map(|s| s.trim().to_ascii_lowercase())
-            .filter(|s| !s.is_empty())
-            .collect();
-        self.background_labels = if parsed.is_empty() {
-            vec!["achtergrond".to_string()]
-        } else {
-            parsed
-        };
-        if !self.rijen.is_empty() {
-            self.apply_presence_threshold();
         }
     }
 
@@ -112,15 +96,11 @@ impl UiApp {
         };
         let mut seen = HashSet::new();
         let mut options = Vec::new();
-        for line in content.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            let (display, scientific_raw) = match trimmed.split_once(',') {
-                Some((name, sci)) => (name.trim(), sci.trim()),
-                None => (trimmed, ""),
-            };
+        let mut reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(content.as_bytes());
+        for record in reader.records().flatten() {
+            let display = record.get(0).unwrap_or_default().trim();
             if display.is_empty() {
                 continue;
             }
@@ -128,15 +108,51 @@ impl UiApp {
             if canonical.is_empty() || !seen.insert(canonical.clone()) {
                 continue;
             }
+            let display_en = if record.len() >= 3 {
+                let raw = record.get(1).unwrap_or_default().trim();
+                if raw.is_empty() {
+                    None
+                } else {
+                    Some(raw.to_string())
+                }
+            } else {
+                None
+            };
+            let scientific_raw = if record.len() >= 3 {
+                record
+                    .iter()
+                    .skip(2)
+                    .collect::<Vec<_>>()
+                    .join(",")
+                    .trim()
+                    .to_string()
+            } else {
+                record.get(1).unwrap_or_default().trim().to_string()
+            };
             options.push(LabelOption {
                 canonical,
                 display: display.to_string(),
+                display_en,
                 scientific: if scientific_raw.is_empty() {
                     None
                 } else {
-                    Some(scientific_raw.to_string())
+                    Some(scientific_raw)
                 },
             });
+        }
+        if options.iter().any(|option| option.display_en.is_none()) {
+            let fallback_path = bundled_models_dir().join(LABEL_FILE_NAME);
+            if fallback_path != path
+                && let Some(english_map) = load_english_labels_from(&fallback_path)
+            {
+                for option in &mut options {
+                    if option.display_en.is_none()
+                        && let Some(display_en) = english_map.get(&option.canonical)
+                    {
+                        option.display_en = Some(display_en.clone());
+                    }
+                }
+            }
         }
         options
     }
@@ -176,6 +192,36 @@ impl UiApp {
 /// Resolves the path that contains the bundled models that ship with the app.
 fn bundled_models_dir() -> PathBuf {
     PathBuf::from("models")
+}
+
+fn load_english_labels_from(path: &Path) -> Option<HashMap<String, String>> {
+    let Ok(content) = fs::read_to_string(path) else {
+        return None;
+    };
+    let mut map = HashMap::new();
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(content.as_bytes());
+    for record in reader.records().flatten() {
+        if record.len() < 3 {
+            continue;
+        }
+        let display = record.get(0).unwrap_or_default().trim();
+        if display.is_empty() {
+            continue;
+        }
+        let canonical = canonical_label(display);
+        if canonical.is_empty() {
+            continue;
+        }
+        let display_en = record.get(1).unwrap_or_default().trim();
+        if display_en.is_empty() {
+            continue;
+        }
+        map.entry(canonical)
+            .or_insert_with(|| display_en.to_string());
+    }
+    if map.is_empty() { None } else { Some(map) }
 }
 
 /// Recursively copies the bundled model files into the writable directory.

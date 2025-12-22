@@ -25,7 +25,10 @@ impl UiApp {
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui
-                    .add(egui::Button::new("Fotomap").selected(self.panel == Panel::Folder))
+                    .add(
+                        egui::Button::new(self.tr("Fotomap", "Photo folder"))
+                            .selected(self.panel == Panel::Folder),
+                    )
                     .clicked()
                 {
                     self.panel = Panel::Folder;
@@ -34,7 +37,8 @@ impl UiApp {
                 if ui
                     .add_enabled(
                         can_view_results,
-                        egui::Button::new("Scanresultaat").selected(self.panel == Panel::Results),
+                        egui::Button::new(self.tr("Scanresultaat", "Results"))
+                            .selected(self.panel == Panel::Results),
                     )
                     .clicked()
                 {
@@ -45,14 +49,18 @@ impl UiApp {
                 if ui
                     .add_enabled(
                         can_view_export,
-                        egui::Button::new("Exporteren").selected(self.panel == Panel::Export),
+                        egui::Button::new(self.tr("Exporteren", "Export"))
+                            .selected(self.panel == Panel::Export),
                     )
                     .clicked()
                 {
                     self.panel = Panel::Export;
                 }
                 if ui
-                    .add(egui::Button::new("Instellingen").selected(self.panel == Panel::Settings))
+                    .add(
+                        egui::Button::new(self.tr("Instellingen", "Settings"))
+                            .selected(self.panel == Panel::Settings),
+                    )
                     .clicked()
                 {
                     self.panel = Panel::Settings;
@@ -92,11 +100,11 @@ impl UiApp {
     fn status_message(&self) -> String {
         if self.status.is_empty() {
             if self.scan_in_progress {
-                "Bezig met scannen...".to_string()
+                self.tr("Bezig met scannen...", "Scanning...").to_string()
             } else if self.has_scanned {
-                "Gereed.".to_string()
+                self.tr("Gereed.", "Done.").to_string()
             } else {
-                "Klaar.".to_string()
+                self.tr("Klaar.", "Ready.").to_string()
             }
         } else {
             self.status.clone()
@@ -125,10 +133,16 @@ impl UiApp {
                         self.save_cache_for_current_folder();
                         let totaal = self.total_files;
                         let (count_present, _, _) = self.view_counts();
-                        self.status = format!(
-                            "Gereed: Dieren gevonden in {count_present} van {totaal} frames ({:.1} s)",
-                            (elapsed_ms as f32) / 1000.0
-                        );
+                        self.status = match self.language {
+                            crate::i18n::Language::Dutch => format!(
+                                "Gereed: Dieren gevonden in {count_present} van {totaal} frames ({:.1} s)",
+                                (elapsed_ms as f32) / 1000.0
+                            ),
+                            crate::i18n::Language::English => format!(
+                                "Done: animals found in {count_present} of {totaal} frames ({:.1} s)",
+                                (elapsed_ms as f32) / 1000.0
+                            ),
+                        };
                         keep = false;
                         break;
                     }
