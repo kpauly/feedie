@@ -15,22 +15,22 @@ impl UiApp {
         if let Some(path) = &self.gekozen_map {
             ui.label(format!(
                 "{}: {}",
-                self.tr("Fotomap", "Photo folder"),
+                self.t("nav-photo-folder"),
                 path.display()
             ));
             ui.label(format!(
                 "{}: {}",
-                self.tr("Afbeeldingen in deze map", "Images in this folder"),
+                self.t("folder-images-count"),
                 self.total_files
             ));
         } else {
-            ui.label(self.tr("Geen fotomap geselecteerd.", "No photo folder selected."));
+            ui.label(self.t("folder-no-selection"));
         }
         ui.add_space(8.0);
         if ui
             .add_enabled(
                 !self.scan_in_progress,
-                egui::Button::new(self.tr("Map kiezen...", "Choose folder...")),
+                egui::Button::new(self.t("folder-choose")),
             )
             .clicked()
             && let Some(dir) = FileDialog::new().set_directory(".").pick_folder()
@@ -39,7 +39,7 @@ impl UiApp {
         }
         let can_scan = self.gekozen_map.is_some() && !self.scan_in_progress;
         if ui
-            .add_enabled(can_scan, egui::Button::new(self.tr("Scannen", "Scan")))
+            .add_enabled(can_scan, egui::Button::new(self.t("folder-scan")))
             .clicked()
             && let Some(dir) = self.gekozen_map.clone()
         {
@@ -58,7 +58,7 @@ impl UiApp {
         let frac = (self.scanned_count as f32) / (total as f32);
         ui.add(egui::ProgressBar::new(frac).text(format!(
             "{}... {} / {} ({:.0}%)",
-            self.tr("Scannen", "Scanning"),
+            self.t("scan-progress"),
             self.scanned_count,
             self.total_files,
             frac * 100.0
@@ -94,10 +94,7 @@ impl UiApp {
                 }
             }
             Err(e) => {
-                self.status = format!(
-                    "{}: {e}",
-                    self.tr("Fout bij lezen van map", "Failed to read folder")
-                );
+                self.status = format!("{}: {e}", self.t("folder-read-error"));
             }
         }
     }
@@ -105,7 +102,7 @@ impl UiApp {
     /// Kicks off an asynchronous scan job for the selected folder.
     pub(super) fn start_scan(&mut self, dir: PathBuf) {
         self.scan_in_progress = true;
-        self.status = self.tr("Bezig met scannen...", "Scanning...").to_string();
+        self.status = self.t("status-scanning");
         self.scanned_count = 0;
         self.panel = Panel::Results;
         let (tx, rx): (Sender<ScanMsg>, Receiver<ScanMsg>) = mpsc::channel();
@@ -119,11 +116,7 @@ impl UiApp {
                 Err(e) => {
                     let _ = tx.send(ScanMsg::Error(format!(
                         "{}: {e}",
-                        crate::i18n::tr_for(
-                            language,
-                            "Map scannen mislukt",
-                            "Failed to scan folder"
-                        )
+                        crate::i18n::t_for(language, "scan-failed")
                     )));
                     tracing::warn!("scan_folder_with failed: {}", e);
                     return;
@@ -136,11 +129,7 @@ impl UiApp {
                 Err(e) => {
                     let _ = tx.send(ScanMsg::Error(format!(
                         "{}: {e}",
-                        crate::i18n::tr_for(
-                            language,
-                            "Model laden mislukt",
-                            "Failed to load model"
-                        )
+                        crate::i18n::t_for(language, "model-load-failed")
                     )));
                     return;
                 }
@@ -151,7 +140,7 @@ impl UiApp {
             }) {
                 let _ = tx.send(ScanMsg::Error(format!(
                     "{}: {e}",
-                    crate::i18n::tr_for(language, "Classificatie mislukt", "Classification failed")
+                    crate::i18n::t_for(language, "classification-failed")
                 )));
                 return;
             }

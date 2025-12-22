@@ -28,17 +28,15 @@ impl UiApp {
             Some(classification) => {
                 let mut label = match &classification.decision {
                     Decision::Label(name) => self.display_for(name),
-                    Decision::Unknown => self.tr("Leeg", "Empty").to_string(),
+                    Decision::Unknown => self.t("label-empty"),
                 };
                 if matches!(&classification.decision, Decision::Label(name) if name.ends_with(" (manueel)"))
                 {
-                    label.push_str(self.tr(" (manueel)", " (manual)"));
+                    label.push_str(&self.t("label-manual-suffix"));
                 }
                 format!("{label} ({:.1}%)", classification.confidence * 100.0)
             }
-            None => self
-                .tr("Geen classificatie", "No classification")
-                .to_string(),
+            None => self.t("label-no-classification"),
         }
     }
 
@@ -124,11 +122,11 @@ impl UiApp {
             return;
         }
         if !self.has_scanned {
-            ui.label(self.tr("Nog geen scan uitgevoerd.", "No scan has been run yet."));
+            ui.label(self.t("results-no-scan"));
             return;
         }
         if self.rijen.is_empty() {
-            ui.label(self.tr("Geen resultaten beschikbaar.", "No results available."));
+            ui.label(self.t("results-no-results"));
             return;
         }
 
@@ -136,15 +134,15 @@ impl UiApp {
         ui.horizontal(|ui| {
             let present_btn = ui.selectable_label(
                 self.view == ViewMode::Aanwezig,
-                format!("{} ({count_present})", self.tr("Aanwezig", "Present")),
+                format!("{} ({count_present})", self.t("tab-present")),
             );
             let empty_btn = ui.selectable_label(
                 self.view == ViewMode::Leeg,
-                format!("{} ({count_empty})", self.tr("Leeg", "Empty")),
+                format!("{} ({count_empty})", self.t("tab-empty")),
             );
             let unsure_btn = ui.selectable_label(
                 self.view == ViewMode::Onzeker,
-                format!("{} ({count_unsure})", self.tr("Onzeker", "Uncertain")),
+                format!("{} ({count_unsure})", self.t("tab-uncertain")),
             );
             if present_btn.clicked() {
                 self.view = ViewMode::Aanwezig;
@@ -190,10 +188,7 @@ impl UiApp {
         };
 
         if filtered.is_empty() {
-            ui.label(self.tr(
-                "Geen frames om te tonen in deze weergave.",
-                "No frames to show in this view.",
-            ));
+            ui.label(self.t("results-no-frames"));
         } else {
             self.queue_thumbnails_for_indices(page_indices);
             if self.current_page + 1 < total_pages {
@@ -215,7 +210,7 @@ impl UiApp {
             if loaded_on_page < page_indices.len() {
                 ui.label(format!(
                     "{}: {loaded_on_page} / {}",
-                    self.tr("Thumbnails laden", "Loading thumbnails"),
+                    self.t("results-loading-thumbnails"),
                     page_indices.len()
                 ));
             }
@@ -258,28 +253,16 @@ impl UiApp {
 
     /// Shows the context menu that allows manual labeling/export shortcuts.
     pub(super) fn render_context_menu(&mut self, ui: &mut egui::Ui, indices: &[usize]) {
-        if ui.button(self.tr("Exporteren", "Export")).clicked() {
+        if ui.button(self.t("action-export")).clicked() {
             self.export_selected_images(indices);
             ui.close();
         }
         ui.separator();
-        if ui
-            .button(self.tr(
-                "Markeer als Achtergrond (Leeg)",
-                "Mark as Background (Empty)",
-            ))
-            .clicked()
-        {
+        if ui.button(self.t("context-mark-background")).clicked() {
             self.assign_manual_category(indices, "achtergrond".into(), false);
             ui.close();
         }
-        if ui
-            .button(self.tr(
-                "Markeer als Iets sp. (Onzeker)",
-                "Mark as Something sp. (Uncertain)",
-            ))
-            .clicked()
-        {
+        if ui.button(self.t("context-mark-something")).clicked() {
             self.assign_manual_category(indices, "iets sp".into(), false);
             ui.close();
         }
@@ -292,14 +275,13 @@ impl UiApp {
             }
         }
         ui.separator();
-        let new_menu_label = self.tr("Nieuw...", "New...");
+        let new_menu_label = self.t("context-new");
         ui.menu_button(new_menu_label, |ui| {
-            let new_label_prompt =
-                self.tr("Vul een nieuwe soortnaam in:", "Enter a new species name:");
+            let new_label_prompt = self.t("context-new-label");
             ui.label(new_label_prompt);
             ui.horizontal(|ui| {
-                let new_label_hint = self.tr("Nieuwe soort", "New species");
-                let ok_label = self.tr("OK", "OK");
+                let new_label_hint = self.t("context-new-label-placeholder");
+                let ok_label = self.t("action-ok");
                 let resp = ui.add(
                     egui::TextEdit::singleline(&mut self.new_label_buffer)
                         .hint_text(new_label_hint),
@@ -339,7 +321,7 @@ impl UiApp {
             let current = self.current_page;
             let label = format!(
                 "{} {} | {}",
-                self.tr("Pagina", "Page"),
+                self.t("results-page"),
                 current + 1,
                 total_pages
             );

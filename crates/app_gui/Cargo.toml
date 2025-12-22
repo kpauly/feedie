@@ -24,7 +24,9 @@ serde = { version = "1.0", features = ["derive"] }
 directories-next = "2.0"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 tempfile = "3.23.0"
-sys-locale = "0.3"
+i18n-embed = { version = "0.14", features = ["desktop-requester"] }
+fluent-templates = "0.13"
+unic-langid = "0.9"
 
 [dev-dependencies]
 rstest = "0.26.1"

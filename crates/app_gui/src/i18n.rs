@@ -1,6 +1,19 @@
-//! Language selection and system locale helpers.
+//! Language selection and Fluent helpers.
 
+use fluent_templates::fluent_bundle::FluentValue;
+use fluent_templates::{Loader, static_loader};
+use i18n_embed::DesktopLanguageRequester;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use unic_langid::LanguageIdentifier;
+
+static_loader! {
+    static LOCALES = {
+        locales: "i18n",
+        fallback_language: "en-US",
+    };
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LanguagePreference {
@@ -25,23 +38,33 @@ impl LanguagePreference {
     }
 }
 
-pub fn detect_system_language() -> Language {
-    match sys_locale::get_locale() {
-        Some(locale) => {
-            let lower = locale.to_ascii_lowercase();
-            if lower.starts_with("nl") {
-                Language::Dutch
-            } else {
-                Language::English
-            }
+impl Language {
+    pub fn id(self) -> LanguageIdentifier {
+        match self {
+            Language::Dutch => "nl-NL".parse().expect("valid langid"),
+            Language::English => "en-US".parse().expect("valid langid"),
         }
-        None => Language::English,
     }
 }
 
-pub fn tr_for(language: Language, nl: &'static str, en: &'static str) -> &'static str {
-    match language {
-        Language::Dutch => nl,
-        Language::English => en,
+pub fn detect_system_language() -> Language {
+    let requested = DesktopLanguageRequester::requested_languages();
+    if requested
+        .iter()
+        .any(|lang| lang.to_string().to_ascii_lowercase().starts_with("nl"))
+    {
+        Language::Dutch
+    } else {
+        Language::English
     }
+}
+
+pub fn t_for(language: Language, key: &str) -> String {
+    LOCALES.lookup(&language.id(), key)
+}
+
+pub type Args = HashMap<Cow<'static, str>, FluentValue<'static>>;
+
+pub fn t_for_args(language: Language, key: &str, args: &Args) -> String {
+    LOCALES.lookup_with_args(&language.id(), key, args)
 }

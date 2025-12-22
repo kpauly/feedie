@@ -117,7 +117,7 @@ impl UiApp {
         self.current_page = 0;
         self.status = format!(
             "{} ({})",
-            self.tr("Gereed: cache geladen", "Done: cache loaded"),
+            self.t("status-cache-loaded"),
             cached.model_version
         );
         self.reset_thumbnail_cache();
