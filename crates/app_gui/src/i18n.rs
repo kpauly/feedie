@@ -6,6 +6,7 @@ use i18n_embed::DesktopLanguageRequester;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use sys_locale::get_locale;
 use unic_langid::LanguageIdentifier;
 
 static_loader! {
@@ -64,26 +65,38 @@ impl Language {
 }
 
 pub fn detect_system_language() -> Language {
+    if let Some(locale) = get_locale()
+        && let Some(language) = language_from_tag(&locale)
+    {
+        return language;
+    }
     let requested = DesktopLanguageRequester::requested_languages();
     for lang in requested {
-        let lower = lang.to_string().to_ascii_lowercase();
-        if lower.starts_with("nl") {
-            return Language::Dutch;
-        }
-        if lower.starts_with("fr") {
-            return Language::French;
-        }
-        if lower.starts_with("de") {
-            return Language::German;
-        }
-        if lower.starts_with("es") {
-            return Language::Spanish;
-        }
-        if lower.starts_with("sv") {
-            return Language::Swedish;
+        if let Some(language) = language_from_tag(&lang.to_string()) {
+            return language;
         }
     }
     Language::English
+}
+
+fn language_from_tag(tag: &str) -> Option<Language> {
+    let lower = tag.to_ascii_lowercase();
+    if lower.starts_with("nl") {
+        return Some(Language::Dutch);
+    }
+    if lower.starts_with("fr") {
+        return Some(Language::French);
+    }
+    if lower.starts_with("de") {
+        return Some(Language::German);
+    }
+    if lower.starts_with("es") {
+        return Some(Language::Spanish);
+    }
+    if lower.starts_with("sv") {
+        return Some(Language::Swedish);
+    }
+    None
 }
 
 pub fn t_for(language: Language, key: &str) -> String {

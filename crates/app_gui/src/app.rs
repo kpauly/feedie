@@ -136,7 +136,8 @@ pub struct UiApp {
     pub(crate) pending_export: Option<PendingExport>,
     pub(crate) coordinate_prompt: Option<CoordinatePrompt>,
     pub(crate) manifest_status: ManifestStatus,
-    pub(crate) update_rx: Option<Receiver<Result<crate::manifest::RemoteManifest, String>>>,
+    pub(crate) update_rx:
+        Option<Receiver<Result<crate::manifest::RemoteManifest, crate::manifest::ManifestError>>>,
     pub(crate) model_download_status: ModelDownloadStatus,
     pub(crate) model_download_rx: Option<Receiver<Result<String, String>>>,
     pub(crate) app_version: String,

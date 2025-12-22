@@ -39,7 +39,21 @@ pub(crate) enum ManifestStatus {
     Idle,
     Checking,
     Ready(UpdateSummary),
-    Error(String),
+    Error(ManifestError),
+}
+
+/// Manifest check errors that can be localized in the UI.
+#[derive(Clone, Copy)]
+pub(crate) enum ManifestError {
+    CheckFailed,
+}
+
+impl ManifestError {
+    fn message_key(self) -> &'static str {
+        match self {
+            ManifestError::CheckFailed => "updates-check-failed",
+        }
+    }
 }
 
 /// Status for background model downloads.
@@ -60,11 +74,14 @@ impl UiApp {
         if matches!(self.manifest_status, ManifestStatus::Checking) {
             return;
         }
-        let (tx, rx) = mpsc::channel();
+        let (tx, rx) = mpsc::channel::<Result<RemoteManifest, ManifestError>>();
         self.update_rx = Some(rx);
         self.manifest_status = ManifestStatus::Checking;
         thread::spawn(move || {
-            let result = fetch_remote_manifest().map_err(|e| e.to_string());
+            let result = fetch_remote_manifest().map_err(|err| {
+                tracing::warn!("Manifest fetch failed: {err}");
+                ManifestError::CheckFailed
+            });
             let _ = tx.send(result);
         });
     }
@@ -77,7 +94,7 @@ impl UiApp {
                 Ok(Err(err)) => self.manifest_status = ManifestStatus::Error(err),
                 Err(TryRecvError::Empty) => self.update_rx = Some(rx),
                 Err(TryRecvError::Disconnected) => {
-                    self.manifest_status = ManifestStatus::Error(self.t("updates-check-failed"));
+                    self.manifest_status = ManifestStatus::Error(ManifestError::CheckFailed);
                 }
             }
         }
@@ -127,7 +144,7 @@ impl UiApp {
                 ui.label(self.t("updates-checking"));
             }
             ManifestStatus::Error(err) => {
-                ui.colored_label(egui::Color32::RED, err);
+                ui.colored_label(egui::Color32::RED, self.t(err.message_key()));
                 if ui.button(self.t("action-try-again")).clicked() {
                     self.request_manifest_refresh();
                 }

@@ -27,6 +27,7 @@ tempfile = "3.23.0"
 i18n-embed = { version = "0.14", features = ["desktop-requester"] }
 fluent-templates = "0.13"
 unic-langid = "0.9"
+sys-locale = "0.3"
 
 [dev-dependencies]
 rstest = "0.26.1"
