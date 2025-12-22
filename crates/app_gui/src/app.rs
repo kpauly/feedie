@@ -260,11 +260,12 @@ impl UiApp {
         normalized
     }
 
-    pub(crate) fn tr(&self, nl: &'static str, en: &'static str) -> &'static str {
-        match self.language {
-            Language::Dutch => nl,
-            Language::English => en,
-        }
+    pub(crate) fn t(&self, key: &str) -> String {
+        crate::i18n::t_for(self.language, key)
+    }
+
+    pub(crate) fn t_args(&self, key: &str, args: &crate::i18n::Args) -> String {
+        crate::i18n::t_for_args(self.language, key, args)
     }
 }
 

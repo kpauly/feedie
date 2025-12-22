@@ -70,31 +70,16 @@ impl UiApp {
     /// Renders the export options pane and action button.
     pub(crate) fn render_export_panel(&mut self, ui: &mut egui::Ui) {
         if !self.has_scanned || self.rijen.is_empty() {
-            ui.label(self.tr(
-                "Er zijn nog geen scanresultaten om te exporteren.",
-                "There are no scan results to export yet.",
-            ));
+            ui.label(self.t("export-no-scan-results"));
             return;
         }
 
-        ui.heading(self.tr("Opties", "Options"));
+        ui.heading(self.t("export-options"));
         ui.add_space(4.0);
-        let present_label = self.tr(
-            "Exporteer foto's met aanwezige soorten",
-            "Export photos with present species",
-        );
-        let uncertain_label = self.tr(
-            "Exporteer foto's met onzekere identificatie",
-            "Export photos with uncertain identification",
-        );
-        let background_label = self.tr(
-            "Exporteer foto's uit Leeg (achtergrond)",
-            "Export photos from Empty (background)",
-        );
-        let csv_label = self.tr(
-            "Exporteer identificatieresultaten als CSV bestand",
-            "Export identification results as CSV",
-        );
+        let present_label = self.t("export-include-present");
+        let uncertain_label = self.t("export-include-uncertain");
+        let background_label = self.t("export-include-background");
+        let csv_label = self.t("export-include-csv");
         ui.checkbox(&mut self.export_present, present_label);
         ui.checkbox(&mut self.export_uncertain, uncertain_label);
         ui.checkbox(&mut self.export_background, background_label);
@@ -105,18 +90,12 @@ impl UiApp {
 
         ui.add_space(12.0);
         let can_export = self.can_export_from_panel();
-        let button = ui.add_enabled(
-            can_export,
-            egui::Button::new(self.tr("Exporteer", "Export")),
-        );
+        let button = ui.add_enabled(can_export, egui::Button::new(self.t("action-export")));
         if button.clicked() {
             self.start_export_workflow();
         }
         if !can_export {
-            ui.label(self.tr(
-                "Selecteer minstens een categorie om te exporteren.",
-                "Select at least one category to export.",
-            ));
+            ui.label(self.t("export-select-category"));
         }
     }
 
@@ -132,18 +111,11 @@ impl UiApp {
     /// Opens the directory picker and stores the pending export configuration.
     fn start_export_workflow(&mut self) {
         if !self.can_export_from_panel() {
-            self.status = self
-                .tr("Geen foto's om te exporteren.", "No photos to export.")
-                .to_string();
+            self.status = self.t("export-none");
             return;
         }
         if self.export_csv && !self.export_present {
-            self.status = self
-                .tr(
-                    "CSV export vereist dat 'aanwezige soorten' wordt meegekopieerd.",
-                    "CSV export requires including present species.",
-                )
-                .to_string();
+            self.status = self.t("export-csv-requires-present");
             return;
         }
 
@@ -152,9 +124,7 @@ impl UiApp {
             dialog = dialog.set_directory(dir);
         }
         let Some(target_dir) = dialog.pick_folder() else {
-            self.status = self
-                .tr("Export geannuleerd.", "Export cancelled.")
-                .to_string();
+            self.status = self.t("export-cancelled");
             return;
         };
 
@@ -186,24 +156,24 @@ impl UiApp {
                 let mut message = if summary.copied == 0 {
                     format!(
                         "{} {}",
-                        self.tr("Geen bestanden geexporteerd in", "No files exported to"),
+                        self.t("export-none-to"),
                         summary.target_dir.display()
                     )
                 } else {
                     format!(
                         "{} {} {}",
                         summary.copied,
-                        self.tr("foto('s) geexporteerd naar", "photo(s) exported to"),
+                        self.t("export-photos-to"),
                         summary.target_dir.display()
                     )
                 };
                 if summary.wrote_csv {
-                    message.push_str(self.tr("; CSV opgeslagen.", "; CSV saved."));
+                    message.push_str(&self.t("export-csv-saved-suffix"));
                 }
                 self.status = message;
             }
             Err(err) => {
-                self.status = format!("{}: {err}", self.tr("Exporteren mislukt", "Export failed"));
+                self.status = format!("{}: {err}", self.t("export-failed"));
             }
         }
     }
@@ -232,28 +202,15 @@ impl UiApp {
         {
             let prompt = self.coordinate_prompt.as_mut().unwrap();
             let mut open = true;
-            let title =
-                crate::i18n::tr_for(language, "Coordinaten voor CSV", "Coordinates for CSV");
-            let prompt_label = crate::i18n::tr_for(
-                language,
-                "Plak hier de Google Maps coordinaten:",
-                "Paste Google Maps coordinates here:",
-            );
-            let paste_label = crate::i18n::tr_for(language, "Plakken", "Paste");
-            let paste_failed = crate::i18n::tr_for(language, "Plakken mislukt", "Paste failed");
-            let tip_intro = crate::i18n::tr_for(language, "Tip: open ", "Tip: open ");
-            let tip_body = crate::i18n::tr_for(
-                language,
-                " en klik met de rechtermuisknop op de plaats van de camera. Klik vervolgens op de coordinaten bovenaan het verschenen keuzemenu. Deze worden automatisch naar het klembord gekopieerd. Klik opnieuw met de rechtermuisknop in het veld hierboven en kies plakken.",
-                " and right-click the camera location. Then click the coordinates shown in the menu; they are copied to the clipboard. Right-click the field above and choose paste.",
-            );
-            let cancel_label = crate::i18n::tr_for(language, "Annuleer", "Cancel");
-            let save_label = crate::i18n::tr_for(language, "Opslaan", "Save");
-            let format_error = crate::i18n::tr_for(
-                language,
-                "Gebruik het formaat '<lat>, <lng>'.",
-                "Use the format '<lat>, <lng>'.",
-            );
+            let title = crate::i18n::t_for(language, "export-coords-title");
+            let prompt_label = crate::i18n::t_for(language, "export-coords-prompt");
+            let paste_label = crate::i18n::t_for(language, "action-paste");
+            let paste_failed = crate::i18n::t_for(language, "export-paste-failed");
+            let tip_intro = crate::i18n::t_for(language, "export-coords-tip-intro");
+            let tip_body = crate::i18n::t_for(language, "export-coords-tip-body");
+            let cancel_label = crate::i18n::t_for(language, "action-cancel");
+            let save_label = crate::i18n::t_for(language, "action-save");
+            let format_error = crate::i18n::t_for(language, "export-coords-format-error");
             egui::Window::new(title)
                 .collapsible(false)
                 .resizable(false)
@@ -283,9 +240,9 @@ impl UiApp {
 
                     ui.add_space(6.0);
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(tip_intro);
+                        ui.label(format!("{tip_intro} "));
                         ui.hyperlink_to("Google Maps", "https://maps.google.com");
-                        ui.label(tip_body);
+                        ui.label(format!(" {tip_body}"));
                     });
 
                     if let Some(err) = &prompt.error {
@@ -328,21 +285,14 @@ impl UiApp {
         } else if close_requested {
             self.pending_export = None;
             self.coordinate_prompt = None;
-            self.status = self
-                .tr("Export geannuleerd.", "Export cancelled.")
-                .to_string();
+            self.status = self.t("export-cancelled");
         }
     }
 
     /// Copies the currently selected thumbnails into a destination folder.
     pub(crate) fn export_selected_images(&mut self, indices: &[usize]) {
         if indices.is_empty() {
-            self.status = self
-                .tr(
-                    "Geen foto's geselecteerd voor export.",
-                    "No photos selected for export.",
-                )
-                .to_string();
+            self.status = self.t("export-no-selection");
             return;
         }
 
@@ -352,31 +302,24 @@ impl UiApp {
         }
 
         let Some(target_dir) = dialog.pick_folder() else {
-            self.status = self
-                .tr("Export geannuleerd.", "Export cancelled.")
-                .to_string();
+            self.status = self.t("export-cancelled");
             return;
         };
 
         match self.copy_selection_to(&target_dir, indices) {
             Ok(0) => {
-                self.status = self
-                    .tr(
-                        "Geen export uitgevoerd: geen bruikbare bestanden gevonden.",
-                        "No export performed: no usable files found.",
-                    )
-                    .to_string();
+                self.status = self.t("export-no-usable-files");
             }
             Ok(count) => {
                 self.status = format!(
                     "{} {} {}",
                     count,
-                    self.tr("foto('s) geexporteerd naar", "photo(s) exported to"),
+                    self.t("export-photos-to"),
                     target_dir.display()
                 );
             }
             Err(err) => {
-                self.status = format!("{}: {err}", self.tr("Exporteren mislukt", "Export failed"));
+                self.status = format!("{}: {err}", self.t("export-failed"));
             }
         }
     }
@@ -400,7 +343,7 @@ impl UiApp {
             fs::create_dir_all(&label_dir).with_context(|| {
                 format!(
                     "{} {}",
-                    self.tr("Kon map niet aanmaken", "Could not create folder"),
+                    self.t("export-create-folder-failed"),
                     label_dir.display()
                 )
             })?;
@@ -421,7 +364,7 @@ impl UiApp {
             fs::copy(&info.file, &dest_path).with_context(|| {
                 format!(
                     "{} {} -> {}",
-                    self.tr("Kopieren mislukt", "Copy failed"),
+                    self.t("export-copy-failed"),
                     info.file.display(),
                     dest_path.display()
                 )
@@ -437,12 +380,12 @@ impl UiApp {
     fn label_for_export(&self, info: &ImageInfo) -> String {
         match info.classification.as_ref().map(|c| &c.decision) {
             Some(Decision::Label(name)) => self.display_for(name),
-            Some(Decision::Unknown) => self.tr("Onbekend", "Unknown").to_string(),
+            Some(Decision::Unknown) => self.t("label-unknown"),
             None => {
                 if info.present {
-                    self.tr("Onbekend", "Unknown").to_string()
+                    self.t("label-unknown")
                 } else {
-                    self.tr("Leeg", "Empty").to_string()
+                    self.t("label-empty")
                 }
             }
         }
@@ -490,18 +433,12 @@ impl UiApp {
             options,
         } = pending;
         if options.include_csv && coords.is_none() {
-            return Err(anyhow!(self.tr(
-                "Coordinaten ontbreken voor CSV-export",
-                "Coordinates missing for CSV export",
-            )));
+            return Err(anyhow!(self.t("export-coords-missing")));
         }
 
         let jobs = self.collect_export_jobs(&options);
         if jobs.is_empty() && !options.include_csv {
-            return Err(anyhow!(self.tr(
-                "Geen bestanden voldeden aan de huidige selectie.",
-                "No files matched the current selection.",
-            )));
+            return Err(anyhow!(self.t("export-selection-empty")));
         }
 
         let mut copied = 0usize;
@@ -517,7 +454,7 @@ impl UiApp {
             fs::create_dir_all(&folder_path).with_context(|| {
                 format!(
                     "{} {}",
-                    self.tr("Kon map niet aanmaken", "Could not create folder"),
+                    self.t("export-create-folder-failed"),
                     folder_path.display()
                 )
             })?;
@@ -537,7 +474,7 @@ impl UiApp {
             fs::copy(&job.source, &dest_path).with_context(|| {
                 format!(
                     "{} {} -> {}",
-                    self.tr("Kopieren mislukt", "Copy failed"),
+                    self.t("export-copy-failed"),
                     job.source.display(),
                     dest_path.display()
                 )
@@ -600,7 +537,7 @@ impl UiApp {
             if options.include_uncertain && self.is_onzeker(info) {
                 jobs.push(ExportJob {
                     source: info.file.clone(),
-                    folder_label: self.tr("Onzeker", "Uncertain").to_string(),
+                    folder_label: self.t("tab-uncertain"),
                     canonical_label: None,
                     include_in_csv: false,
                 });
@@ -608,7 +545,7 @@ impl UiApp {
             if options.include_background && self.belongs_in_leeg(info) {
                 jobs.push(ExportJob {
                     source: info.file.clone(),
-                    folder_label: self.tr("Leeg", "Empty").to_string(),
+                    folder_label: self.t("label-empty"),
                     canonical_label: None,
                     include_in_csv: false,
                 });
@@ -671,7 +608,7 @@ impl UiApp {
         self.status = format!(
             "{} {} {}",
             indices.len(),
-            self.tr("kaart(en) gemarkeerd als", "item(s) marked as"),
+            self.t("status-marked-as"),
             display
         );
 
@@ -685,36 +622,16 @@ impl UiApp {
             let label_for_upload = canonical.clone();
             let api_key = ROBOFLOW_API_KEY.trim();
             if api_key.is_empty() {
-                self.status = self
-                    .tr(
-                        "Roboflow upload staat aan, maar er is geen API-sleutel ingebouwd.",
-                        "Roboflow upload is enabled, but no API key is embedded.",
-                    )
-                    .to_string();
+                self.status = self.t("roboflow-no-key");
             } else if dataset.is_empty() {
-                self.status = self
-                    .tr(
-                        "Roboflow upload niet uitgevoerd: dataset ontbreekt.",
-                        "Roboflow upload skipped: dataset missing.",
-                    )
-                    .to_string();
+                self.status = self.t("roboflow-no-dataset");
             } else if paths.is_empty() {
-                self.status = self
-                    .tr(
-                        "Roboflow upload niet uitgevoerd: geen foto's geselecteerd.",
-                        "Roboflow upload skipped: no photos selected.",
-                    )
-                    .to_string();
+                self.status = self.t("roboflow-no-photos");
             } else {
                 let upload_count = paths.len();
                 let status_tx = self.upload_status_tx.clone();
                 let language = self.language;
-                self.status = self
-                    .tr(
-                        "Foto('s) met manuele identificatie worden geupload...",
-                        "Photo(s) with manual labels are being uploaded...",
-                    )
-                    .to_string();
+                self.status = self.t("roboflow-uploading");
                 std::thread::spawn(move || {
                     let mut last_err: Option<String> = None;
                     for path in paths {
@@ -728,28 +645,15 @@ impl UiApp {
                     let message = if let Some(err) = last_err {
                         format!(
                             "{}: {err}",
-                            crate::i18n::tr_for(
-                                language,
-                                "Upload van foto('s) met manuele identificatie mislukt",
-                                "Upload of photos with manual labels failed",
-                            )
+                            crate::i18n::t_for(language, "roboflow-upload-failed")
                         )
                     } else if upload_count == 1 {
-                        crate::i18n::tr_for(
-                            language,
-                            "Foto met manuele identificatie geupload.",
-                            "Photo with manual label uploaded.",
-                        )
-                        .to_string()
+                        crate::i18n::t_for(language, "roboflow-uploaded-one")
                     } else {
                         format!(
                             "{} {}",
                             upload_count,
-                            crate::i18n::tr_for(
-                                language,
-                                "foto's met manuele identificatie geupload.",
-                                "photos with manual labels uploaded.",
-                            )
+                            crate::i18n::t_for(language, "roboflow-uploaded-many")
                         )
                     };
                     let _ = status_tx.send(message);
@@ -764,17 +668,13 @@ impl UiApp {
     pub(crate) fn apply_new_label(&mut self, indices: &[usize]) -> bool {
         let trimmed = self.new_label_buffer.trim();
         if trimmed.is_empty() {
-            self.status = self
-                .tr("Geen label ingevuld.", "No label entered.")
-                .to_string();
+            self.status = self.t("label-none-entered");
             return false;
         }
         let new_label = trimmed.to_string();
         let canonical = canonical_label(&new_label);
         if canonical.is_empty() {
-            self.status = self
-                .tr("Label is ongeldig.", "Label is invalid.")
-                .to_string();
+            self.status = self.t("label-invalid");
             return false;
         }
         if !self
@@ -807,10 +707,10 @@ impl UiApp {
     pub(crate) fn display_for(&self, name: &str) -> String {
         let canonical = canonical_label(name);
         if canonical == "iets sp" {
-            return self.tr("Iets sp.", "Something sp.").to_string();
+            return self.t("label-something");
         }
         if canonical == "achtergrond" {
-            return self.tr("Achtergrond", "Background").to_string();
+            return self.t("label-background");
         }
         if let Some(option) = self
             .label_options
@@ -839,11 +739,7 @@ fn write_export_csv(
 ) -> anyhow::Result<PathBuf> {
     let base = format!("voederhuiscamera_{}", export_time.format("%y%m%d%H%M"));
     let csv_path = next_available_export_path(dir, &base, "csv");
-    let open_error = crate::i18n::tr_for(
-        language,
-        "Kon CSV-bestand niet openen",
-        "Could not open CSV file",
-    );
+    let open_error = crate::i18n::t_for(language, "export-csv-open-failed");
     let mut writer = csv::Writer::from_path(&csv_path)
         .with_context(|| format!("{} {}", open_error, csv_path.display()))?;
     writer.write_record(["date", "time", "scientific name", "lat", "lng", "path"])?;

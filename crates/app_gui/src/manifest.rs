@@ -77,10 +77,7 @@ impl UiApp {
                 Ok(Err(err)) => self.manifest_status = ManifestStatus::Error(err),
                 Err(TryRecvError::Empty) => self.update_rx = Some(rx),
                 Err(TryRecvError::Disconnected) => {
-                    self.manifest_status = ManifestStatus::Error(
-                        self.tr("Zoeken naar updates is mislukt", "Update check failed")
-                            .to_string(),
-                    );
+                    self.manifest_status = ManifestStatus::Error(self.t("updates-check-failed"));
                 }
             }
         }
@@ -119,25 +116,19 @@ impl UiApp {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(6.0);
-        ui.heading(self.tr("Updates", "Updates"));
+        ui.heading(self.t("updates-title"));
         match &self.manifest_status {
             ManifestStatus::Idle => {
-                if ui
-                    .button(self.tr("Controleer op updates", "Check for updates"))
-                    .clicked()
-                {
+                if ui.button(self.t("updates-check")).clicked() {
                     self.request_manifest_refresh();
                 }
             }
             ManifestStatus::Checking => {
-                ui.label(self.tr("Zoeken naar updates...", "Checking for updates..."));
+                ui.label(self.t("updates-checking"));
             }
             ManifestStatus::Error(err) => {
                 ui.colored_label(egui::Color32::RED, err);
-                if ui
-                    .button(self.tr("Opnieuw proberen", "Try again"))
-                    .clicked()
-                {
+                if ui.button(self.t("action-try-again")).clicked() {
                     self.request_manifest_refresh();
                 }
             }
@@ -146,49 +137,33 @@ impl UiApp {
                 if summary.app_update_available {
                     ui.label(format!(
                         "{}: {}",
-                        self.tr("Nieuwe app-versie beschikbaar", "New app version available"),
+                        self.t("updates-app-available"),
                         summary.latest_app
                     ));
-                    ui.hyperlink_to(
-                        self.tr("Open downloadpagina", "Open download page"),
-                        &summary.app_url,
-                    );
+                    ui.hyperlink_to(self.t("updates-open-download"), &summary.app_url);
                 } else {
-                    ui.label(self.tr(
-                        "Je gebruikt de nieuwste app-versie.",
-                        "You are using the latest app version.",
-                    ));
+                    ui.label(self.t("updates-app-latest"));
                 }
                 ui.add_space(4.0);
                 if summary.model_update_available {
                     ui.label(format!(
                         "{}: {}",
-                        self.tr("Nieuw herkenningsmodel beschikbaar", "New model available"),
+                        self.t("updates-model-available"),
                         summary.latest_model
                     ));
                     if let Some(size) = summary.model_size_mb {
-                        ui.label(format!(
-                            "{}: {:.1} MB",
-                            self.tr("Geschatte downloadgrootte", "Estimated download size"),
-                            size
-                        ));
+                        ui.label(format!("{}: {:.1} MB", self.t("updates-model-size"), size));
                     }
                     if let Some(notes) = &summary.model_notes {
                         ui.label(notes);
                     }
                     self.render_model_download_actions(ui, &summary);
                 } else {
-                    ui.label(self.tr(
-                        "Herkenningsmodel is up-to-date.",
-                        "Recognition model is up to date.",
-                    ));
+                    ui.label(self.t("updates-model-latest"));
                     self.render_model_download_feedback(ui);
                 }
                 ui.add_space(6.0);
-                if ui
-                    .button(self.tr("Opnieuw controleren", "Check again"))
-                    .clicked()
-                {
+                if ui.button(self.t("updates-check-again")).clicked() {
                     self.request_manifest_refresh();
                 }
             }
@@ -203,34 +178,22 @@ impl UiApp {
     ) {
         match &self.model_download_status {
             ModelDownloadStatus::Idle => {
-                if ui
-                    .button(self.tr("Download en installeren", "Download and install"))
-                    .clicked()
-                {
+                if ui.button(self.t("updates-download-install")).clicked() {
                     self.start_model_download(summary);
                 }
             }
             ModelDownloadStatus::Downloading => {
-                ui.label(self.tr(
-                    "Modelupdate wordt gedownload...",
-                    "Downloading model update...",
-                ));
+                ui.label(self.t("updates-model-downloading"));
             }
             ModelDownloadStatus::Error(err) => {
                 ui.colored_label(egui::Color32::RED, err);
-                if ui
-                    .button(self.tr("Opnieuw downloaden", "Download again"))
-                    .clicked()
-                {
+                if ui.button(self.t("updates-download-again")).clicked() {
                     self.start_model_download(summary);
                 }
             }
             ModelDownloadStatus::Success(msg) => {
                 ui.label(msg);
-                if ui
-                    .button(self.tr("Download opnieuw", "Download again"))
-                    .clicked()
-                {
+                if ui.button(self.t("updates-download-again")).clicked() {
                     self.start_model_download(summary);
                 }
             }
@@ -241,16 +204,10 @@ impl UiApp {
     pub(crate) fn render_model_download_feedback(&self, ui: &mut egui::Ui) {
         match &self.model_download_status {
             ModelDownloadStatus::Idle => {
-                ui.label(self.tr(
-                    "Geen recente modeldownloads uitgevoerd.",
-                    "No recent model downloads.",
-                ));
+                ui.label(self.t("updates-no-downloads"));
             }
             ModelDownloadStatus::Downloading => {
-                ui.label(self.tr(
-                    "Modeldownload wordt uitgevoerd...",
-                    "Model download in progress...",
-                ));
+                ui.label(self.t("updates-download-progress"));
             }
             ModelDownloadStatus::Error(err) => {
                 ui.colored_label(egui::Color32::RED, err);
@@ -288,7 +245,7 @@ impl UiApp {
                     let normalized = normalize_model_version(&version);
                     self.model_download_status = ModelDownloadStatus::Success(format!(
                         "{} {normalized}.",
-                        self.tr("Model geinstalleerd", "Model installed")
+                        self.t("updates-model-installed")
                     ));
                     self.model_version = read_model_version_from(&self.model_version_path());
                     self.label_options = Self::load_label_options_from(&self.labels_path());
@@ -301,10 +258,8 @@ impl UiApp {
                     self.model_download_rx = Some(rx);
                 }
                 Err(TryRecvError::Disconnected) => {
-                    self.model_download_status = ModelDownloadStatus::Error(
-                        self.tr("Downloadkanaal verbroken", "Download channel closed")
-                            .to_string(),
-                    );
+                    self.model_download_status =
+                        ModelDownloadStatus::Error(self.t("updates-download-channel-closed"));
                 }
             }
         }

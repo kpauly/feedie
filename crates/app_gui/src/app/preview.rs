@@ -71,19 +71,13 @@ impl UiApp {
                 Decision::Label(name) => {
                     let mut label = self.display_for(name);
                     if name.ends_with(" (manueel)") {
-                        label.push_str(self.tr(" (manueel)", " (manual)"));
+                        label.push_str(&self.t("label-manual-suffix"));
                     }
                     format!("{label} ({:.1}%)", classification.confidence * 100.0)
                 }
-                Decision::Unknown => self.tr("Leeg", "Empty").to_string(),
+                Decision::Unknown => self.t("label-empty"),
             })
-            .unwrap_or_else(|| {
-                self.tr(
-                    "Geen classificatie beschikbaar.",
-                    "No classification available.",
-                )
-                .to_string()
-            });
+            .unwrap_or_else(|| self.t("preview-no-classification"));
         let full_tex = self.get_or_load_full_image(ctx, &info_path);
         let tex_info = full_tex.as_ref().map(|tex| (tex.id(), tex.size_vec2()));
         let viewport_id = preview.viewport_id;
@@ -132,10 +126,7 @@ impl UiApp {
                 ui.horizontal(|ui| {
                     let prev_disabled = preview.current == 0;
                     if ui
-                        .add_enabled(
-                            !prev_disabled,
-                            egui::Button::new(self.tr("< Vorige", "< Previous")),
-                        )
+                        .add_enabled(!prev_disabled, egui::Button::new(self.t("preview-prev")))
                         .clicked()
                     {
                         action = PreviewAction::Prev;
@@ -145,10 +136,7 @@ impl UiApp {
                     }
                     let next_disabled = preview.current + 1 >= indices.len();
                     if ui
-                        .add_enabled(
-                            !next_disabled,
-                            egui::Button::new(self.tr("Volgende >", "Next >")),
-                        )
+                        .add_enabled(!next_disabled, egui::Button::new(self.t("preview-next")))
                         .clicked()
                     {
                         action = PreviewAction::Next;
@@ -178,10 +166,7 @@ impl UiApp {
                         self.render_context_menu(ui, &current_targets);
                     });
                 } else {
-                    ui.label(self.tr(
-                        "Afbeelding kon niet geladen worden.",
-                        "Image could not be loaded.",
-                    ));
+                    ui.label(self.t("preview-image-load-failed"));
                 }
             });
         });
