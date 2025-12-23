@@ -290,8 +290,44 @@ mod classifier {
         self as efficientvit_model, Config as EfficientVitConfig,
     };
     use rayon::prelude::*;
-    use std::fs;
+    use std::fs::{self, OpenOptions};
+    use std::io::Write;
     use std::path::PathBuf;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::Instant;
+
+    struct TimingLogger {
+        file: Mutex<std::fs::File>,
+    }
+
+    impl TimingLogger {
+        fn new(path: PathBuf) -> Option<Self> {
+            let file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .ok()?;
+            Some(Self {
+                file: Mutex::new(file),
+            })
+        }
+
+        fn log(&self, line: &str) {
+            if let Ok(mut file) = self.file.lock() {
+                let _ = writeln!(file, "{line}");
+            }
+        }
+    }
+
+    fn timing_logger() -> Option<&'static TimingLogger> {
+        static LOGGER: OnceLock<Option<TimingLogger>> = OnceLock::new();
+        LOGGER
+            .get_or_init(|| {
+                let path = std::env::var("FEEDER_TIMING_LOG").ok()?;
+                TimingLogger::new(PathBuf::from(path))
+            })
+            .as_ref()
+    }
 
     /// Enumerates the EfficientViT variants this crate knows about.
     #[derive(Debug, Clone, Copy, Default)]
@@ -484,6 +520,9 @@ mod classifier {
                 return Ok(());
             }
 
+            let logger = timing_logger();
+            let prep_start = logger.map(|_| Instant::now());
+
             let inputs: Vec<_> = chunk
                 .iter()
                 .enumerate()
@@ -526,15 +565,40 @@ mod classifier {
                 }
             }
 
+            let prep_ms = prep_start.map(|start| start.elapsed().as_millis());
             if tensors.is_empty() {
+                if let Some(logger) = logger {
+                    let prep_ms = prep_ms.unwrap_or(0);
+                    logger.log(&format!(
+                        "batch_size={}, chunk_len={}, tensors=0, prep_ms={}, forward_ms=0, total_ms={}",
+                        self.batch_size, chunk.len(), prep_ms, prep_ms
+                    ));
+                }
                 return Ok(());
             }
 
+            let forward_start = logger.map(|_| Instant::now());
             let views = tensors.iter().collect::<Vec<_>>();
             let batch = Tensor::stack(&views, 0)?;
             let logits = self.model.forward(&batch)?;
             let probs = nn::ops::softmax(&logits, D::Minus1)?;
             let probs_rows = probs.to_vec2::<f32>()?;
+            let forward_ms = forward_start.map(|start| start.elapsed().as_millis());
+
+            if let Some(logger) = logger {
+                let prep_ms = prep_ms.unwrap_or(0);
+                let forward_ms = forward_ms.unwrap_or(0);
+                let total_ms = prep_ms + forward_ms;
+                logger.log(&format!(
+                    "batch_size={}, chunk_len={}, tensors={}, prep_ms={}, forward_ms={}, total_ms={}",
+                    self.batch_size,
+                    chunk.len(),
+                    tensors.len(),
+                    prep_ms,
+                    forward_ms,
+                    total_ms
+                ));
+            }
 
             for (row_probs, idx_in_chunk) in probs_rows.into_iter().zip(tensor_order.into_iter()) {
                 if let Some(info) = chunk.get_mut(idx_in_chunk) {
