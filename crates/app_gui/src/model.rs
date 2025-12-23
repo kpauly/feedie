@@ -65,7 +65,6 @@ impl UiApp {
             model_path: self.model_file_path(),
             labels_path: self.labels_path(),
             presence_threshold: self.pending_presence_threshold,
-            batch_size: self.batch_size.max(1),
             background_labels: self.background_labels.clone(),
             ..Default::default()
         }

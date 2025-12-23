@@ -89,22 +89,6 @@ impl UiApp {
         });
         ui.add_space(12.0);
         ui.horizontal(|ui| {
-            ui.label(self.t("settings-batch-size"));
-            let auto_label = self.t("settings-batch-size-auto");
-            let auto_resp = ui.checkbox(&mut self.auto_batch_size, auto_label);
-            let resp = ui.add_enabled(
-                !self.auto_batch_size,
-                egui::DragValue::new(&mut self.batch_size)
-                    .range(1..=64)
-                    .speed(1),
-            );
-            if auto_resp.changed() || resp.changed() {
-                self.status = self.t("settings-batch-size-status");
-                self.persist_settings();
-            }
-        });
-        ui.add_space(12.0);
-        ui.horizontal(|ui| {
             ui.label(self.t("settings-background-labels"));
             let background_label = self.display_for(BACKGROUND_LABEL);
             let something_label = self.display_for(SOMETHING_LABEL);

@@ -108,8 +108,6 @@ impl UiApp {
         let (tx, rx): (Sender<ScanMsg>, Receiver<ScanMsg>) = mpsc::channel();
         self.rx = Some(rx);
         let cfg = self.classifier_config();
-        let auto_batch_size = self.auto_batch_size;
-        let batch_size = self.batch_size;
         let language = self.language;
         thread::spawn(move || {
             let t0 = Instant::now();
@@ -137,15 +135,9 @@ impl UiApp {
                 }
             };
             let tx_progress = tx.clone();
-            if let Err(e) = classify_with_auto_batch(
-                &classifier,
-                &mut rows,
-                auto_batch_size,
-                batch_size,
-                |done, total| {
-                    let _ = tx_progress.send(ScanMsg::Progress(done.min(total), total));
-                },
-            ) {
+            if let Err(e) = classify_with_auto_batch(&classifier, &mut rows, |done, total| {
+                let _ = tx_progress.send(ScanMsg::Progress(done.min(total), total));
+            }) {
                 let _ = tx.send(ScanMsg::Error(format!(
                     "{}: {e}",
                     crate::i18n::t_for(language, "classification-failed")
@@ -169,8 +161,6 @@ const AUTO_BATCH_MIN_IMPROVEMENT: f64 = 0.15;
 fn classify_with_auto_batch<F>(
     classifier: &EfficientVitClassifier,
     rows: &mut [ImageInfo],
-    auto_batch_size: bool,
-    manual_batch_size: usize,
     mut progress: F,
 ) -> anyhow::Result<()>
 where
@@ -180,9 +170,12 @@ where
     if total == 0 {
         return Ok(());
     }
-    let manual_batch_size = manual_batch_size.max(1);
-    if !auto_batch_size || total < AUTO_BATCH_MIN_TOTAL {
-        return classifier.classify_with_progress_and_batch_size(rows, manual_batch_size, progress);
+    if total < AUTO_BATCH_MIN_TOTAL {
+        return classifier.classify_with_progress_and_batch_size(
+            rows,
+            AUTO_BATCH_BASELINE,
+            progress,
+        );
     }
 
     let mut offset = 0usize;
@@ -232,7 +225,7 @@ where
     } else if let Some((size, _)) = timings.first() {
         chosen = *size;
     } else {
-        chosen = manual_batch_size;
+        chosen = AUTO_BATCH_BASELINE;
     }
 
     if offset < total {

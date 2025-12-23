@@ -11,8 +11,6 @@ use std::path::PathBuf;
 pub(crate) struct AppSettings {
     pub(crate) language: LanguagePreference,
     pub(crate) background_labels: Vec<String>,
-    pub(crate) batch_size: usize,
-    pub(crate) auto_batch_size: bool,
 }
 
 impl Default for AppSettings {
@@ -20,8 +18,6 @@ impl Default for AppSettings {
         Self {
             language: LanguagePreference::System,
             background_labels: vec!["achtergrond".to_string()],
-            batch_size: 8,
-            auto_batch_size: false,
         }
     }
 }
