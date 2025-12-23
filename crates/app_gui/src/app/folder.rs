@@ -137,13 +137,10 @@ impl UiApp {
                 }
             };
             let tx_progress = tx.clone();
-            let batch_size = if auto_batch_size {
-                auto_tune_batch_size(&classifier, &rows)
-            } else {
-                batch_size.max(1)
-            };
-            if let Err(e) = classifier.classify_with_progress_and_batch_size(
+            if let Err(e) = classify_with_auto_batch(
+                &classifier,
                 &mut rows,
+                auto_batch_size,
                 batch_size,
                 |done, total| {
                     let _ = tx_progress.send(ScanMsg::Progress(done.min(total), total));
@@ -163,38 +160,89 @@ impl UiApp {
     }
 }
 
-const AUTO_BATCH_CANDIDATES: [usize; 4] = [4, 8, 12, 16];
-const AUTO_BATCH_SAMPLE: usize = 32;
+const AUTO_BATCH_MIN_TOTAL: usize = 1000;
+const AUTO_BATCH_BASELINE: usize = 8;
+const AUTO_BATCH_CANDIDATES: [usize; 2] = [AUTO_BATCH_BASELINE, 12];
+const AUTO_BATCH_TUNE_BATCHES: usize = 4;
+const AUTO_BATCH_MIN_IMPROVEMENT: f64 = 0.15;
 
-fn auto_tune_batch_size(classifier: &EfficientVitClassifier, rows: &[ImageInfo]) -> usize {
+fn classify_with_auto_batch<F>(
+    classifier: &EfficientVitClassifier,
+    rows: &mut [ImageInfo],
+    auto_batch_size: bool,
+    manual_batch_size: usize,
+    mut progress: F,
+) -> anyhow::Result<()>
+where
+    F: FnMut(usize, usize),
+{
     let total = rows.len();
     if total == 0 {
-        return 1;
+        return Ok(());
     }
-    let mut candidates: Vec<usize> = AUTO_BATCH_CANDIDATES
-        .into_iter()
-        .filter(|&size| size <= total)
-        .collect();
-    if candidates.is_empty() {
-        return total.max(1);
+    let manual_batch_size = manual_batch_size.max(1);
+    if !auto_batch_size || total < AUTO_BATCH_MIN_TOTAL {
+        return classifier.classify_with_progress_and_batch_size(rows, manual_batch_size, progress);
     }
-    let sample_len = total.min(AUTO_BATCH_SAMPLE);
-    let sample: Vec<ImageInfo> = rows.iter().take(sample_len).cloned().collect();
-    let mut best = (f64::INFINITY, candidates[0]);
-    for candidate in candidates.drain(..) {
-        let mut sample_rows = sample.clone();
+
+    let mut offset = 0usize;
+    let mut timings: Vec<(usize, f64)> = Vec::new();
+    for &candidate in AUTO_BATCH_CANDIDATES.iter() {
+        let tune_len = candidate * AUTO_BATCH_TUNE_BATCHES;
+        if offset + tune_len > total {
+            break;
+        }
         let start = Instant::now();
-        if classifier
-            .classify_with_progress_and_batch_size(&mut sample_rows, candidate, |_, _| {})
-            .is_err()
-        {
-            continue;
-        }
+        let mut local_done = 0usize;
+        classifier.classify_with_progress_and_batch_size(
+            &mut rows[offset..offset + tune_len],
+            candidate,
+            |done, _| {
+                if done == local_done {
+                    return;
+                }
+                local_done = done;
+                progress(offset + local_done, total);
+            },
+        )?;
         let elapsed = start.elapsed().as_secs_f64();
-        let per_image = elapsed / sample_len as f64;
-        if per_image < best.0 {
-            best = (per_image, candidate);
+        if local_done > 0 {
+            timings.push((candidate, elapsed / local_done as f64));
         }
+        offset += local_done;
     }
-    best.1
+
+    let mut chosen = AUTO_BATCH_BASELINE;
+    if let Some(base_time) = timings
+        .iter()
+        .find(|(size, _)| *size == AUTO_BATCH_BASELINE)
+        .map(|(_, per_image)| *per_image)
+    {
+        let mut best_time = base_time;
+        for (size, per_image) in &timings {
+            if *size == AUTO_BATCH_BASELINE {
+                continue;
+            }
+            if *per_image < base_time * (1.0 - AUTO_BATCH_MIN_IMPROVEMENT) && *per_image < best_time
+            {
+                best_time = *per_image;
+                chosen = *size;
+            }
+        }
+    } else if let Some((size, _)) = timings.first() {
+        chosen = *size;
+    } else {
+        chosen = manual_batch_size;
+    }
+
+    if offset < total {
+        classifier.classify_with_progress_and_batch_size(
+            &mut rows[offset..],
+            chosen,
+            |done, _| {
+                progress(offset + done, total);
+            },
+        )?;
+    }
+    Ok(())
 }
