@@ -22,9 +22,10 @@
 //! # run().unwrap();
 //! ```
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use candle_core::{Device, Tensor};
-use image::{DynamicImage, imageops::FilterType};
+use fast_image_resize::{self as fr, images::Image as FrImage};
+use image::DynamicImage;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -217,9 +218,22 @@ fn is_supported_image(path: &Path) -> bool {
     }
 }
 
-/// Resizes an image to a fixed square while preserving aspect ratio via padding.
-fn resize_to_square(img: DynamicImage, size: u32) -> DynamicImage {
-    img.resize_exact(size, size, FilterType::Triangle)
+/// Resizes an image to a fixed square using a SIMD-aware resizer.
+fn resize_to_square_rgb(img: DynamicImage, size: u32) -> Result<Vec<u8>> {
+    let rgb = img.into_rgb8();
+    let (width, height) = (rgb.width(), rgb.height());
+    let src = FrImage::from_vec_u8(width, height, rgb.into_raw(), fr::PixelType::U8x3)
+        .context("resize source buffer invalid")?;
+    let mut dst = FrImage::new(size, size, fr::PixelType::U8x3);
+    let mut resizer = fr::Resizer::new();
+    let options = fr::ResizeOptions {
+        algorithm: fr::ResizeAlg::Convolution(fr::FilterType::Bilinear),
+        ..Default::default()
+    };
+    resizer
+        .resize(&src, &mut dst, Some(&options))
+        .context("resize failed")?;
+    Ok(dst.into_vec())
 }
 
 /// Convert an image file into a normalized tensor (CHW) on the provided device.
@@ -262,14 +276,14 @@ fn load_image_tensor_data(
     std: [f32; 3],
 ) -> Result<Vec<f32>> {
     let img = image::open(path)?;
-    let resized = resize_to_square(img, size).to_rgba8();
+    let resized = resize_to_square_rgb(img, size)?;
     let hw = (size * size) as usize;
     let mut data = vec![0f32; hw * 3];
-    for (y, x, pixel) in resized.enumerate_pixels() {
-        let idx = (y * size + x) as usize;
-        data[idx] = normalize_channel(pixel.0[0], mean[0], std[0]);
-        data[hw + idx] = normalize_channel(pixel.0[1], mean[1], std[1]);
-        data[2 * hw + idx] = normalize_channel(pixel.0[2], mean[2], std[2]);
+    for idx in 0..hw {
+        let base = idx * 3;
+        data[idx] = normalize_channel(resized[base], mean[0], std[0]);
+        data[hw + idx] = normalize_channel(resized[base + 1], mean[1], std[1]);
+        data[2 * hw + idx] = normalize_channel(resized[base + 2], mean[2], std[2]);
     }
     Ok(data)
 }
