@@ -307,7 +307,8 @@ mod classifier {
     use std::fs::{self, OpenOptions};
     use std::io::Write;
     use std::path::PathBuf;
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::{Mutex, OnceLock, mpsc};
+    use std::thread;
     use std::time::Instant;
 
     struct TimingLogger {
@@ -341,6 +342,20 @@ mod classifier {
                 TimingLogger::new(PathBuf::from(path))
             })
             .as_ref()
+    }
+
+    const PIPELINE_QUEUE_DEPTH: usize = 2;
+
+    struct BatchSpec {
+        start: usize,
+        files: Vec<PathBuf>,
+    }
+
+    struct PreparedBatch {
+        start: usize,
+        len: usize,
+        items: Vec<(usize, PathBuf, Result<Vec<f32>>)>,
+        prep_ms: u128,
     }
 
     /// Enumerates the EfficientViT variants this crate knows about.
@@ -531,119 +546,161 @@ mod classifier {
 
             let mut processed = 0usize;
             let batch_size = batch_size.max(1);
-            for chunk in rows.chunks_mut(batch_size) {
-                self.classify_chunk(chunk)?;
-                processed += chunk.len();
-                progress(processed.min(total), total);
-            }
-            Ok(())
-        }
-
-        fn classify_chunk(&self, chunk: &mut [ImageInfo]) -> Result<()> {
-            if chunk.is_empty() {
-                return Ok(());
-            }
-
-            let logger = timing_logger();
-            let prep_start = logger.map(|_| Instant::now());
-
-            let inputs: Vec<_> = chunk
-                .iter()
+            let specs: Vec<BatchSpec> = rows
+                .chunks(batch_size)
                 .enumerate()
-                .map(|(idx, info)| (idx, info.file.clone()))
-                .collect();
-
-            let mut prepared: Vec<_> = inputs
-                .into_par_iter()
-                .map(|(idx, path)| {
-                    let data = load_image_tensor_data(&path, self.input_size, self.mean, self.std);
-                    (idx, path, data)
+                .map(|(batch_idx, chunk)| BatchSpec {
+                    start: batch_idx * batch_size,
+                    files: chunk.iter().map(|info| info.file.clone()).collect(),
                 })
                 .collect();
-            prepared.sort_by_key(|(idx, _, _)| *idx);
+            let wants_timing = timing_logger().is_some();
+            let (tx, rx) = mpsc::sync_channel(PIPELINE_QUEUE_DEPTH);
+            let input_size = self.input_size;
+            let mean = self.mean;
+            let std = self.std;
+            thread::spawn(move || {
+                for spec in specs {
+                    let prepared = Self::prepare_batch(spec, input_size, mean, std, wants_timing);
+                    if tx.send(prepared).is_err() {
+                        break;
+                    }
+                }
+            });
 
-            let mut tensor_order: Vec<usize> = Vec::new();
-            let mut tensors: Vec<Tensor> = Vec::new();
-            for (idx, path, data_res) in prepared {
-                match data_res {
-                    Ok(data) => match self.tensor_from_data(data) {
-                        Ok(tensor) => {
-                            tensor_order.push(idx);
-                            tensors.push(tensor);
-                        }
+            let logger = timing_logger();
+            for prepared in rx {
+                let start = prepared.start;
+                let len = prepared.len;
+                if len == 0 {
+                    continue;
+                }
+                let chunk = &mut rows[start..start + len];
+                let mut tensor_order: Vec<usize> = Vec::new();
+                let mut tensors: Vec<Tensor> = Vec::new();
+                for (idx, path, data_res) in prepared.items {
+                    match data_res {
+                        Ok(data) => match self.tensor_from_data(data) {
+                            Ok(tensor) => {
+                                tensor_order.push(idx);
+                                tensors.push(tensor);
+                            }
+                            Err(err) => {
+                                tracing::warn!(
+                                    "Tensor bouwen mislukt voor {}: {err}",
+                                    path.display()
+                                );
+                                if let Some(info) = chunk.get_mut(idx) {
+                                    info.present = false;
+                                    info.classification = None;
+                                }
+                            }
+                        },
                         Err(err) => {
-                            tracing::warn!("Tensor bouwen mislukt voor {}: {err}", path.display());
+                            tracing::warn!(
+                                "Afbeelding laden mislukt voor {}: {err}",
+                                path.display()
+                            );
                             if let Some(info) = chunk.get_mut(idx) {
                                 info.present = false;
                                 info.classification = None;
                             }
                         }
-                    },
-                    Err(err) => {
-                        tracing::warn!("Afbeelding laden mislukt voor {}: {err}", path.display());
-                        if let Some(info) = chunk.get_mut(idx) {
-                            info.present = false;
-                            info.classification = None;
-                        }
                     }
                 }
-            }
 
-            let prep_ms = prep_start.map(|start| start.elapsed().as_millis());
-            if tensors.is_empty() {
+                if tensors.is_empty() {
+                    if let Some(logger) = logger {
+                        let prep_ms = prepared.prep_ms;
+                        logger.log(&format!(
+                            "batch_size={}, chunk_len={}, tensors=0, prep_ms={}, forward_ms=0, total_ms={}",
+                            batch_size, len, prep_ms, prep_ms
+                        ));
+                    }
+                    processed += len;
+                    progress(processed.min(total), total);
+                    continue;
+                }
+
+                let forward_start = logger.map(|_| Instant::now());
+                let views = tensors.iter().collect::<Vec<_>>();
+                let batch = Tensor::stack(&views, 0)?;
+                let logits = self.model.forward(&batch)?;
+                let probs = nn::ops::softmax(&logits, D::Minus1)?;
+                let probs_rows = probs.to_vec2::<f32>()?;
+                let forward_ms = forward_start.map(|start| start.elapsed().as_millis());
+
                 if let Some(logger) = logger {
-                    let prep_ms = prep_ms.unwrap_or(0);
+                    let prep_ms = prepared.prep_ms;
+                    let forward_ms = forward_ms.unwrap_or(0);
+                    let total_ms = prep_ms + forward_ms;
                     logger.log(&format!(
-                        "batch_size={}, chunk_len={}, tensors=0, prep_ms={}, forward_ms=0, total_ms={}",
-                        self.batch_size, chunk.len(), prep_ms, prep_ms
+                        "batch_size={}, chunk_len={}, tensors={}, prep_ms={}, forward_ms={}, total_ms={}",
+                        batch_size,
+                        len,
+                        tensors.len(),
+                        prep_ms,
+                        forward_ms,
+                        total_ms
                     ));
                 }
-                return Ok(());
-            }
 
-            let forward_start = logger.map(|_| Instant::now());
-            let views = tensors.iter().collect::<Vec<_>>();
-            let batch = Tensor::stack(&views, 0)?;
-            let logits = self.model.forward(&batch)?;
-            let probs = nn::ops::softmax(&logits, D::Minus1)?;
-            let probs_rows = probs.to_vec2::<f32>()?;
-            let forward_ms = forward_start.map(|start| start.elapsed().as_millis());
-
-            if let Some(logger) = logger {
-                let prep_ms = prep_ms.unwrap_or(0);
-                let forward_ms = forward_ms.unwrap_or(0);
-                let total_ms = prep_ms + forward_ms;
-                logger.log(&format!(
-                    "batch_size={}, chunk_len={}, tensors={}, prep_ms={}, forward_ms={}, total_ms={}",
-                    self.batch_size,
-                    chunk.len(),
-                    tensors.len(),
-                    prep_ms,
-                    forward_ms,
-                    total_ms
-                ));
-            }
-
-            for (row_probs, idx_in_chunk) in probs_rows.into_iter().zip(tensor_order.into_iter()) {
-                if let Some(info) = chunk.get_mut(idx_in_chunk) {
-                    match self.build_result_from_probs(&row_probs) {
-                        Ok(result) => {
-                            info.present = result.present;
-                            info.classification = result.classification;
-                        }
-                        Err(err) => {
-                            tracing::warn!(
-                                "Resultaat opbouwen mislukt voor {}: {err}",
-                                info.file.display()
-                            );
-                            info.present = false;
-                            info.classification = None;
+                for (row_probs, idx_in_chunk) in
+                    probs_rows.into_iter().zip(tensor_order.into_iter())
+                {
+                    if let Some(info) = chunk.get_mut(idx_in_chunk) {
+                        match self.build_result_from_probs(&row_probs) {
+                            Ok(result) => {
+                                info.present = result.present;
+                                info.classification = result.classification;
+                            }
+                            Err(err) => {
+                                tracing::warn!(
+                                    "Resultaat opbouwen mislukt voor {}: {err}",
+                                    info.file.display()
+                                );
+                                info.present = false;
+                                info.classification = None;
+                            }
                         }
                     }
                 }
+
+                processed += len;
+                progress(processed.min(total), total);
             }
 
             Ok(())
+        }
+
+        fn prepare_batch(
+            spec: BatchSpec,
+            input_size: u32,
+            mean: [f32; 3],
+            std: [f32; 3],
+            wants_timing: bool,
+        ) -> PreparedBatch {
+            let prep_start = wants_timing.then(Instant::now);
+            let len = spec.files.len();
+            let mut prepared: Vec<_> = spec
+                .files
+                .into_par_iter()
+                .enumerate()
+                .map(|(idx, path)| {
+                    let data = load_image_tensor_data(&path, input_size, mean, std);
+                    (idx, path, data)
+                })
+                .collect();
+            prepared.sort_by_key(|(idx, _, _)| *idx);
+            let prep_ms = prep_start
+                .map(|start| start.elapsed().as_millis())
+                .unwrap_or(0);
+            PreparedBatch {
+                start: spec.start,
+                len,
+                items: prepared,
+                prep_ms,
+            }
         }
 
         fn tensor_from_data(&self, data: Vec<f32>) -> Result<Tensor> {
