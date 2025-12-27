@@ -11,6 +11,7 @@ impl UiApp {
             self.status = msg;
         }
         self.poll_manifest_updates();
+        self.poll_app_download();
         self.poll_model_download();
         self.poll_thumbnail_results(ctx);
         self.drain_scan_channel();

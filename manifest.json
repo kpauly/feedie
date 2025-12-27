@@ -1,7 +1,10 @@
 {
   "app": {
     "latest": "1.2.0",
-    "url": "https://github.com/kpauly/feedie/releases/tag/v1.2.0"
+    "url": "https://github.com/kpauly/feedie/releases/tag/v1.2.0",
+    "windows": {
+      "url": "https://github.com/kpauly/feedie/releases/download/v1.2.0/FeedieSetup-1.2.0.exe"
+    }
   },
   "model": {
     "latest": "model-v1.0.0",

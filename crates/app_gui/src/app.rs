@@ -2,7 +2,7 @@
 
 use crate::export::{CoordinatePrompt, PendingExport};
 use crate::i18n::{Language, LanguagePreference};
-use crate::manifest::{ManifestStatus, ModelDownloadStatus};
+use crate::manifest::{AppDownloadStatus, ManifestStatus, ModelDownloadStatus};
 use crate::settings_store::{AppSettings, load_settings, save_settings};
 use crate::util::canonical_label;
 use eframe::{App, Frame, egui};
@@ -139,6 +139,9 @@ pub struct UiApp {
         Option<Receiver<Result<crate::manifest::RemoteManifest, crate::manifest::ManifestError>>>,
     pub(crate) model_download_status: ModelDownloadStatus,
     pub(crate) model_download_rx: Option<Receiver<Result<String, String>>>,
+    pub(crate) app_download_status: AppDownloadStatus,
+    pub(crate) app_download_rx:
+        Option<Receiver<Result<PathBuf, crate::manifest::AppDownloadError>>>,
     pub(crate) app_version: String,
     pub(crate) model_version: String,
     pub(crate) model_root: PathBuf,
@@ -208,6 +211,8 @@ impl UiApp {
             update_rx: None,
             model_download_status: ModelDownloadStatus::Idle,
             model_download_rx: None,
+            app_download_status: AppDownloadStatus::Idle,
+            app_download_rx: None,
             app_version: env!("FEEDIE_VERSION").to_string(),
             model_version,
             model_root,
