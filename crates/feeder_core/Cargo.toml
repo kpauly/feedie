@@ -16,6 +16,7 @@ safetensors = "0.6.2"
 serde = { version = "1.0.228", features = ["derive"] }
 tracing = "0.1.41"
 walkdir = "2.5.0"
+zune-jpeg = "0.5.8"
 
 [dev-dependencies]
 tempfile = "3.23.0"

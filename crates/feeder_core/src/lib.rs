@@ -25,10 +25,14 @@
 use anyhow::{Context, Result};
 use candle_core::{Device, Tensor};
 use fast_image_resize::{self as fr, images::Image as FrImage};
-use image::DynamicImage;
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use zune_jpeg::JpegDecoder;
+use zune_jpeg::zune_core::bytestream::ZCursor;
+use zune_jpeg::zune_core::colorspace::ColorSpace;
+use zune_jpeg::zune_core::options::DecoderOptions;
 
 pub use classifier::{ClassifierConfig, EfficientVitClassifier, EfficientVitVariant};
 
@@ -219,10 +223,8 @@ fn is_supported_image(path: &Path) -> bool {
 }
 
 /// Resizes an image to a fixed square using a SIMD-aware resizer.
-fn resize_to_square_rgb(img: DynamicImage, size: u32) -> Result<Vec<u8>> {
-    let rgb = img.into_rgb8();
-    let (width, height) = (rgb.width(), rgb.height());
-    let src = FrImage::from_vec_u8(width, height, rgb.into_raw(), fr::PixelType::U8x3)
+fn resize_to_square_rgb(raw: Vec<u8>, width: u32, height: u32, size: u32) -> Result<Vec<u8>> {
+    let src = FrImage::from_vec_u8(width, height, raw, fr::PixelType::U8x3)
         .context("resize source buffer invalid")?;
     let mut dst = FrImage::new(size, size, fr::PixelType::U8x3);
     let mut resizer = fr::Resizer::new();
@@ -234,6 +236,40 @@ fn resize_to_square_rgb(img: DynamicImage, size: u32) -> Result<Vec<u8>> {
         .resize(&src, &mut dst, Some(&options))
         .context("resize failed")?;
     Ok(dst.into_vec())
+}
+
+/// Decodes an image into an RGB buffer plus dimensions.
+fn decode_image_rgb(path: &Path) -> Result<(Vec<u8>, u32, u32)> {
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("jpg") | Some("jpeg") => decode_jpeg_rgb(path),
+        _ => decode_image_rgb_with_image(path),
+    }
+}
+
+fn decode_image_rgb_with_image(path: &Path) -> Result<(Vec<u8>, u32, u32)> {
+    let img = image::open(path)?;
+    let rgb = img.into_rgb8();
+    let (width, height) = (rgb.width(), rgb.height());
+    Ok((rgb.into_raw(), width, height))
+}
+
+fn decode_jpeg_rgb(path: &Path) -> Result<(Vec<u8>, u32, u32)> {
+    let bytes = fs::read(path)
+        .with_context(|| format!("failed to read jpeg {}", path.to_string_lossy()))?;
+    let options = DecoderOptions::default().jpeg_set_out_colorspace(ColorSpace::RGB);
+    let mut decoder = JpegDecoder::new_with_options(ZCursor::new(bytes), options);
+    decoder
+        .decode_headers()
+        .context("jpeg header decode failed")?;
+    let info = decoder
+        .info()
+        .ok_or_else(|| anyhow::anyhow!("jpeg info missing"))?;
+    let pixels = decoder.decode().context("jpeg decode failed")?;
+    Ok((pixels, u32::from(info.width), u32::from(info.height)))
 }
 
 /// Convert an image file into a normalized tensor (CHW) on the provided device.
@@ -275,8 +311,8 @@ fn load_image_tensor_data(
     mean: [f32; 3],
     std: [f32; 3],
 ) -> Result<Vec<f32>> {
-    let img = image::open(path)?;
-    let resized = resize_to_square_rgb(img, size)?;
+    let (raw, width, height) = decode_image_rgb(path)?;
+    let resized = resize_to_square_rgb(raw, width, height, size)?;
     let hw = (size * size) as usize;
     let mut data = vec![0f32; hw * 3];
     for idx in 0..hw {
