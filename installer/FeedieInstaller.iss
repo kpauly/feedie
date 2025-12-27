@@ -36,6 +36,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\target\release\Feedie.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\runtime\windows\libiomp5md.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\runtime\windows\Intel_OpenMP_LICENSE.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "..\models\*"; DestDir: "{app}\models"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\manifest.json"; DestDir: "{app}"; Flags: ignoreversion
 
