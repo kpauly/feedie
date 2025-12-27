@@ -471,7 +471,7 @@ fn fetch_remote_manifest() -> anyhow::Result<RemoteManifest> {
         .build()
         .context("HTTP-client kon niet worden opgebouwd")?;
     let response = client
-        .get(MANIFEST_URL)
+        .get(manifest_url())
         .send()
         .context("Manifest kon niet worden opgehaald")?
         .error_for_status()
@@ -480,6 +480,10 @@ fn fetch_remote_manifest() -> anyhow::Result<RemoteManifest> {
         .json::<RemoteManifest>()
         .context("Manifest kon niet worden geparseerd")?;
     Ok(manifest)
+}
+
+fn manifest_url() -> String {
+    env::var("FEEDIE_MANIFEST_URL").unwrap_or_else(|_| MANIFEST_URL.to_string())
 }
 
 /// Returns true if `latest` represents a version newer than `current`.
