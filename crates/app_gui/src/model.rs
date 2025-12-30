@@ -9,6 +9,7 @@ use anyhow::{Context, anyhow};
 use directories_next::ProjectDirs;
 use feeder_core::{ClassifierConfig, Decision, ImageInfo};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -149,7 +150,10 @@ impl UiApp {
 
     /// Copies the bundled models into the writable directory when missing.
     pub(crate) fn ensure_models_present(target: &Path) -> anyhow::Result<()> {
-        if target.exists() {
+        if target.exists()
+            && target.join(MODEL_FILE_NAME).exists()
+            && target.join(LABEL_FILE_NAME).exists()
+        {
             return Ok(());
         }
         if let Some(parent) = target.parent() {
@@ -162,6 +166,27 @@ impl UiApp {
 
 /// Resolves the path that contains the bundled models that ship with the app.
 fn bundled_models_dir() -> PathBuf {
+    if let Ok(exe_path) = env::current_exe()
+        && let Some(exe_dir) = exe_path.parent()
+    {
+        #[cfg(target_os = "macos")]
+        if let Some(contents_dir) = exe_dir.parent() {
+            let resources_dir = contents_dir.join("Resources");
+            if resources_dir.exists() {
+                return resources_dir.join("models");
+            }
+        }
+        let exe_models = exe_dir.join("models");
+        if exe_models.exists() {
+            return exe_models;
+        }
+    }
+    if let Ok(cwd) = env::current_dir() {
+        let cwd_models = cwd.join("models");
+        if cwd_models.exists() {
+            return cwd_models;
+        }
+    }
     PathBuf::from("models")
 }
 
@@ -257,6 +282,9 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> anyhow::Result<()> {
         if ty.is_dir() {
             copy_dir_recursive(&entry.path(), &dest_path)?;
         } else if ty.is_file() {
+            if dest_path.exists() {
+                continue;
+            }
             fs::copy(entry.path(), &dest_path).with_context(|| {
                 format!(
                     "Kopi\u{00EB}ren van {} naar {} mislukt",
