@@ -9,6 +9,7 @@ use anyhow::{Context, anyhow};
 use directories_next::ProjectDirs;
 use feeder_core::{ClassifierConfig, Decision, ImageInfo};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -162,6 +163,54 @@ impl UiApp {
 
 /// Resolves the path that contains the bundled models that ship with the app.
 fn bundled_models_dir() -> PathBuf {
+    if let Ok(app_dir) = env::var("APPDIR") {
+        let trimmed = app_dir.trim();
+        if !trimmed.is_empty() {
+            let base = PathBuf::from(trimmed);
+            let candidates = [
+                base.join("usr").join("share").join("feedie").join("models"),
+                base.join("usr").join("share").join("Feedie").join("models"),
+                base.join("models"),
+            ];
+            for candidate in candidates {
+                if candidate.exists() {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    if let Ok(exe_path) = env::current_exe()
+        && let Some(exe_dir) = exe_path.parent()
+    {
+        let exe_models = exe_dir.join("models");
+        if exe_models.exists() {
+            return exe_models;
+        }
+        if let Some(dir_name) = exe_dir.file_name()
+            && dir_name == "bin"
+            && let Some(usr_dir) = exe_dir.parent()
+        {
+            let share_dir = usr_dir.join("share");
+            let candidates = [
+                share_dir.join("feedie").join("models"),
+                share_dir.join("Feedie").join("models"),
+            ];
+            for candidate in candidates {
+                if candidate.exists() {
+                    return candidate;
+                }
+            }
+        }
+    }
+
+    if let Ok(cwd) = env::current_dir() {
+        let cwd_models = cwd.join("models");
+        if cwd_models.exists() {
+            return cwd_models;
+        }
+    }
+
     PathBuf::from("models")
 }
 
