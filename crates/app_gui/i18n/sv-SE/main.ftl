@@ -21,6 +21,7 @@ folder-images-count = Bilder i den här mappen
 folder-no-selection = Ingen fotomapp vald.
 folder-choose = Välj mapp...
 folder-scan = Skanna
+folder-include-subfolders = Inkludera undermappar
 folder-read-error = Misslyckades att läsa mappen
 
 results-no-scan = Ingen skanning har körts ännu.

@@ -11,6 +11,7 @@ use std::path::PathBuf;
 pub(crate) struct AppSettings {
     pub(crate) language: LanguagePreference,
     pub(crate) background_labels: Vec<String>,
+    pub(crate) scan_recursive: bool,
 }
 
 impl Default for AppSettings {
@@ -18,6 +19,7 @@ impl Default for AppSettings {
         Self {
             language: LanguagePreference::System,
             background_labels: vec!["achtergrond".to_string()],
+            scan_recursive: false,
         }
     }
 }

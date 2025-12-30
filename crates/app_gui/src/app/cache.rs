@@ -24,6 +24,8 @@ struct CachedFile {
 struct CachedScan {
     generated_at: u64,
     model_version: String,
+    #[serde(default)]
+    recursive: bool,
     files: Vec<CachedFile>,
     total_files: usize,
 }
@@ -32,13 +34,17 @@ fn cache_dir() -> Option<PathBuf> {
     ProjectDirs::from("nl", "Feedie", "Feedie").map(|dirs| dirs.data_dir().join("cache"))
 }
 
-fn cache_path_for_folder(folder: &Path) -> Option<PathBuf> {
+fn cache_path_for_folder(folder: &Path, recursive: bool) -> Option<PathBuf> {
     let dir = cache_dir()?;
     let canonical = folder
         .canonicalize()
         .unwrap_or_else(|_| folder.to_path_buf());
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    canonical.to_string_lossy().hash(&mut hasher);
+    let mut key = canonical.to_string_lossy().to_string();
+    if recursive {
+        key.push_str("|recursive");
+    }
+    key.hash(&mut hasher);
     let hash = format!("{:x}", hasher.finish());
     Some(dir.join(format!("{hash}.json")))
 }
@@ -63,8 +69,12 @@ fn now_secs() -> u64 {
 }
 
 impl UiApp {
-    pub(crate) fn try_load_cached_scan(&mut self, folder: &Path) -> anyhow::Result<bool> {
-        let Some(cache_file) = cache_path_for_folder(folder) else {
+    pub(crate) fn try_load_cached_scan(
+        &mut self,
+        folder: &Path,
+        recursive: bool,
+    ) -> anyhow::Result<bool> {
+        let Some(cache_file) = cache_path_for_folder(folder, recursive) else {
             return Ok(false);
         };
         if !cache_file.exists() {
@@ -74,9 +84,12 @@ impl UiApp {
             .with_context(|| format!("Cannot read cache {}", cache_file.display()))?;
         let cached: CachedScan =
             serde_json::from_str(&data).with_context(|| "Corrupt cache file")?;
+        if cached.recursive != recursive {
+            return Ok(false);
+        }
 
         // Build current file signatures.
-        let rows = feeder_core::scan_folder_with(folder, feeder_core::ScanOptions::default())
+        let rows = feeder_core::scan_folder_with(folder, feeder_core::ScanOptions { recursive })
             .with_context(|| "Failed to list folder while validating cache")?;
         let mut current: HashMap<String, (PathBuf, u64, u64)> = HashMap::new();
         for info in rows {
@@ -134,7 +147,7 @@ impl UiApp {
         if self.rijen.is_empty() {
             return;
         }
-        let Some(cache_file) = cache_path_for_folder(folder) else {
+        let Some(cache_file) = cache_path_for_folder(folder, self.scan_recursive) else {
             return;
         };
         if let Some(dir) = cache_file.parent()
@@ -164,6 +177,7 @@ impl UiApp {
         let payload = CachedScan {
             generated_at: now_secs(),
             model_version: self.model_version.clone(),
+            recursive: self.scan_recursive,
             total_files: files.len(),
             files,
         };
