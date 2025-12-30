@@ -21,6 +21,7 @@ folder-images-count = Afbeeldingen in deze map
 folder-no-selection = Geen fotomap geselecteerd.
 folder-choose = Map kiezen...
 folder-scan = Scannen
+folder-include-subfolders = Submappen doorzoeken
 folder-read-error = Fout bij lezen van map
 
 results-no-scan = Nog geen scan uitgevoerd.

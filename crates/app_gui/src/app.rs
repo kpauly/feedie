@@ -104,6 +104,7 @@ pub struct UiApp {
     pub(crate) scanned_count: usize,
     pub(crate) has_scanned: bool,
     pub(crate) scan_in_progress: bool,
+    pub(crate) scan_recursive: bool,
     pub(crate) status: String,
     pub(crate) view: ViewMode,
     pub(crate) panel: Panel,
@@ -177,6 +178,7 @@ impl UiApp {
             scanned_count: 0,
             has_scanned: false,
             scan_in_progress: false,
+            scan_recursive: settings.scan_recursive,
             status: String::new(),
             view: ViewMode::default(),
             panel: Panel::Folder,
@@ -254,6 +256,7 @@ impl UiApp {
         let settings = AppSettings {
             language: self.language_preference,
             background_labels: self.background_labels.clone(),
+            scan_recursive: self.scan_recursive,
         };
         if let Err(err) = save_settings(&settings) {
             tracing::warn!("Instellingen konden niet worden opgeslagen: {err}");

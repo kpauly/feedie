@@ -21,6 +21,7 @@ folder-images-count = Imágenes en esta carpeta
 folder-no-selection = No se seleccionó ninguna carpeta de fotos.
 folder-choose = Elegir carpeta...
 folder-scan = Escanear
+folder-include-subfolders = Incluir subcarpetas
 folder-read-error = Error al leer la carpeta
 
 results-no-scan = Aún no se ha ejecutado ningún escaneo.

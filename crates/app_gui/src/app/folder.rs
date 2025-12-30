@@ -37,6 +37,17 @@ impl UiApp {
         {
             self.set_selected_folder(dir);
         }
+        let recursive_label = self.t("folder-include-subfolders");
+        let recursive_response = ui.add_enabled(
+            !self.scan_in_progress,
+            egui::Checkbox::new(&mut self.scan_recursive, recursive_label),
+        );
+        if recursive_response.changed() {
+            self.persist_settings();
+            if let Some(dir) = self.gekozen_map.clone() {
+                self.set_selected_folder(dir);
+            }
+        }
         let can_scan = self.gekozen_map.is_some() && !self.scan_in_progress;
         if ui
             .add_enabled(can_scan, egui::Button::new(self.t("folder-scan")))
@@ -80,10 +91,15 @@ impl UiApp {
         self.reset_thumbnail_cache();
         self.full_images.clear();
         self.full_keys.clear();
-        match scan_folder_with(&dir, ScanOptions { recursive: false }) {
+        match scan_folder_with(
+            &dir,
+            ScanOptions {
+                recursive: self.scan_recursive,
+            },
+        ) {
             Ok(rows) => {
                 self.total_files = rows.len();
-                match self.try_load_cached_scan(&dir) {
+                match self.try_load_cached_scan(&dir, self.scan_recursive) {
                     Ok(true) => {
                         self.panel = Panel::Results;
                     }
@@ -109,9 +125,10 @@ impl UiApp {
         self.rx = Some(rx);
         let cfg = self.classifier_config();
         let language = self.language;
+        let recursive = self.scan_recursive;
         thread::spawn(move || {
             let t0 = Instant::now();
-            let mut rows = match scan_folder_with(&dir, ScanOptions { recursive: false }) {
+            let mut rows = match scan_folder_with(&dir, ScanOptions { recursive }) {
                 Ok(r) => r,
                 Err(e) => {
                     let _ = tx.send(ScanMsg::Error(format!(
