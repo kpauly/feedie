@@ -9,6 +9,8 @@ on:
 jobs:
   build-macos:
     runs-on: ${{ matrix.runner }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
     strategy:
       fail-fast: false
       matrix:
@@ -72,6 +74,9 @@ jobs:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
         run: |
           cargo bundle --release --target ${{ matrix.target }} -p app_gui
+          plist="target/${{ matrix.target }}/release/bundle/osx/Feedie.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${FEEDIE_VERSION}" "$plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${FEEDIE_VERSION}" "$plist"
           cd target/${{ matrix.target }}/release/bundle/osx
           zip_name="${{ matrix.artifact }}-${FEEDIE_VERSION}.zip"
           ditto -c -k --keepParent Feedie.app "$zip_name"
