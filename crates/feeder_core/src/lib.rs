@@ -342,7 +342,10 @@ fn normalize_channel(value: u8, mean: f32, std: f32) -> f32 {
 
 /// EfficientViT classifier implementation and configuration helpers.
 mod classifier {
-    use super::{Classification, Decision, ImageInfo, load_image_tensor_data};
+    use super::{
+        Classification, Decision, ImageInfo, canonical_label_for_match, load_image_tensor_data,
+        strip_label_bom,
+    };
     use anyhow::{Context, Result};
     use candle_core::{D, DType, Device, Tensor};
     use candle_nn::{self as nn, Func, Module, VarBuilder};
