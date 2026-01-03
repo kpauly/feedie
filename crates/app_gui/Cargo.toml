@@ -3,7 +3,8 @@ name = "app_gui"
 version = "1.2.0"
 edition = "2024"
 build = "build.rs"
-default-run = "app_gui"
+autobins = false
+default-run = "Feedie"
 
 [dependencies]
 anyhow = "1.0.100"
@@ -38,6 +39,10 @@ rfd = { version = "0.15.4", default-features = false, features = ["gtk3"] }
 rfd = "0.15.4"
 
 [[bin]]
+name = "Feedie"
+path = "src/main.rs"
+
+[[bin]]
 name = "FeedieUpdater"
 path = "src/bin/feedie_updater.rs"
 
@@ -51,6 +56,7 @@ rstest = "0.26.1"
 name = "Feedie"
 identifier = "nl.feedie.app"
 version = "1.2.0"
+bin = "Feedie"
 short_description = "Efficiënte triage voor voederhuiscamera's"
 copyright = "Copyright (c) 2025 Klaas"
 resources = [

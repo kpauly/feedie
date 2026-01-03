@@ -49,7 +49,7 @@ mkdir -p "${APPDIR}/usr/share/feedie/models"
 mkdir -p "${APPDIR}/usr/share/applications"
 mkdir -p "${APPDIR}/usr/share/icons/hicolor/256x256/apps"
 
-cp "${ROOT}/target/release/app_gui" "${APPDIR}/usr/bin/Feedie"
+cp "${ROOT}/target/release/Feedie" "${APPDIR}/usr/bin/Feedie"
 cp -a "${ROOT}/models/." "${APPDIR}/usr/share/feedie/models/"
 cp "${DESKTOP_FILE}" "${APPDIR}/usr/share/applications/"
 cp "${ICON_SOURCE}" "${APPDIR}/usr/share/icons/hicolor/256x256/apps/feedie.png"

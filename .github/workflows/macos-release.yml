@@ -64,7 +64,7 @@ jobs:
         env:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
           FEEDIE_ROBOFLOW_API_KEY: ${{ secrets.FEEDIE_ROBOFLOW_API_KEY }}
-        run: cargo build --release --target ${{ matrix.target }} -p app_gui
+        run: cargo build --release --target ${{ matrix.target }} -p app_gui --bin Feedie
 
       - name: Install cargo-bundle
         run: cargo install cargo-bundle --locked
@@ -73,7 +73,7 @@ jobs:
         env:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
         run: |
-          cargo bundle --release --target ${{ matrix.target }} -p app_gui
+          cargo bundle --release --target ${{ matrix.target }} -p app_gui --bin Feedie
           plist="target/${{ matrix.target }}/release/bundle/osx/Feedie.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${FEEDIE_VERSION}" "$plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${FEEDIE_VERSION}" "$plist"

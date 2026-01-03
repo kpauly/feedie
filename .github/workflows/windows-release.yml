@@ -51,10 +51,7 @@ jobs:
         env:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
           FEEDIE_ROBOFLOW_API_KEY: ${{ secrets.FEEDIE_ROBOFLOW_API_KEY }}
-        run: cargo build --release -p app_gui
-
-      - name: Prepare Feedie binary
-        run: Copy-Item target\release\app_gui.exe target\release\Feedie.exe -Force
+        run: cargo build --release -p app_gui --bins
 
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y

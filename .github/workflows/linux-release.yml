@@ -63,7 +63,7 @@ jobs:
         env:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
           FEEDIE_ROBOFLOW_API_KEY: ${{ secrets.FEEDIE_ROBOFLOW_API_KEY }}
-        run: cargo build --release -p app_gui
+        run: cargo build --release -p app_gui --bin Feedie
 
       - name: Download AppImage tooling
         run: |
