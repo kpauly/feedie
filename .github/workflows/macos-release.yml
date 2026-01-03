@@ -80,13 +80,12 @@ jobs:
             echo "No .app bundle found in $bundle_dir"
             exit 1
           fi
-          app_base="$(basename "$app_path")"
-          plist="$bundle_dir/$app_base/Contents/Info.plist"
+          plist="$app_path/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${FEEDIE_VERSION}" "$plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${FEEDIE_VERSION}" "$plist"
           cd "$bundle_dir"
           zip_name="${{ matrix.artifact }}-${FEEDIE_VERSION}.zip"
-          ditto -c -k --keepParent "$app_base" "$zip_name"
+          ditto -c -k --keepParent "$(basename "$app_path")" "$zip_name"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
