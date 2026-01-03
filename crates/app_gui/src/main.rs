@@ -33,10 +33,16 @@ fn apply_crostini_x11_workaround() {
         return;
     }
     if env::var_os("WINIT_UNIX_BACKEND").is_none() {
-        env::set_var("WINIT_UNIX_BACKEND", "x11");
+        // SAFETY: set before any threads spawn or libraries read env vars.
+        unsafe {
+            env::set_var("WINIT_UNIX_BACKEND", "x11");
+        }
     }
     if env::var_os("GDK_BACKEND").is_none() {
-        env::set_var("GDK_BACKEND", "x11");
+        // SAFETY: set before any threads spawn or libraries read env vars.
+        unsafe {
+            env::set_var("GDK_BACKEND", "x11");
+        }
     }
 }
 
