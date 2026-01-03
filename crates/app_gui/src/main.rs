@@ -17,7 +17,7 @@ use std::sync::Arc;
 use util::load_app_icon;
 
 #[cfg(target_os = "linux")]
-use std::{env, path::Path};
+use std::{env, fs, path::Path};
 
 #[cfg(target_os = "linux")]
 fn is_crostini() -> bool {
@@ -25,6 +25,19 @@ fn is_crostini() -> bool {
         || env::var_os("SOMMELIER_VERSION").is_some()
         || env::var_os("SOMMELIER_SCALE").is_some()
         || Path::new("/dev/.cros_milestone").exists()
+        || Path::new("/mnt/chromeos").is_dir()
+        || fs::read_to_string("/proc/sys/kernel/osrelease")
+            .map(|value| {
+                let value = value.to_lowercase();
+                value.contains("cros") || value.contains("termina")
+            })
+            .unwrap_or(false)
+        || fs::read_to_string("/proc/version")
+            .map(|value| {
+                let value = value.to_lowercase();
+                value.contains("chromeos") || value.contains("chromium") || value.contains("cros")
+            })
+            .unwrap_or(false)
 }
 
 #[cfg(target_os = "linux")]
