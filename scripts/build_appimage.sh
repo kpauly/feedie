@@ -3,11 +3,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="${FEEDIE_VERSION:-0.0.0-dev}"
+ARCH="${FEEDIE_APPIMAGE_ARCH:-x86_64}"
 
 APPDIR="${ROOT}/dist/AppDir"
 DESKTOP_FILE="${ROOT}/installer/linux/feedie.desktop"
 ICON_SOURCE="${ROOT}/assets/Feedie_icon_256.png"
-APPIMAGE_NAME="Feedie-linux-x86_64-${VERSION}.AppImage"
+APPIMAGE_NAME="Feedie-linux-${ARCH}-${VERSION}.AppImage"
 
 LINUXDEPLOY="${LINUXDEPLOY:-}"
 APPIMAGETOOL="${APPIMAGETOOL:-}"

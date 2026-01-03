@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Feedie - Backyard species detection for feeder cameras</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="styles.css" />
+        <link rel="icon" type="image/png" href="assets/feedie-icon.png" />
+        <link rel="apple-touch-icon" href="assets/feedie-icon.png" />
+    </head>
+    <body>
+        <header class="hero" id="home">
+            <nav class="nav">
+                <div class="logo">
+                    <img src="assets/feedie-icon.png" alt="Feedie icon" />
+                    <span>Feedie</span>
+                </div>
+                <div class="nav-right">
+                    <div class="nav-links">
+                        <a href="#about">About</a>
+                        <a href="#download">Download</a>
+                        <a href="#usage">How it works</a>
+                        <a href="#license">License</a>
+                    </div>
+                    <div class="nav-lang" aria-label="Language">
+                        <a class="lang" href="index.html">NL</a>
+                        <a class="lang active" href="en.html">EN</a>
+                    </div>
+                </div>
+            </nav>
+            <div class="hero-content">
+                <div class="hero-text">
+                    <p class="eyebrow">Smart sorting, more time to enjoy</p>
+                    <h1>Get the most out of your feeder camera</h1>
+                    <p>
+                        Feedie is a lightweight Windows, macOS, and Linux app
+                        (AppImage). In a few clicks you scan full SD cards, see
+                        which visitors showed up, and export your best photos.
+                        The UI is available in Dutch, English, French, German,
+                        Spanish, and Swedish.
+                    </p>
+                    <div class="cta-group">
+                        <a
+                            class="cta"
+                            id="download-windows"
+                            href="https://github.com/kpauly/feedie/releases"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            Download for Windows
+                        </a>
+                        <a
+                            class="cta ghost"
+                            id="download-mac-arm"
+                            href="https://github.com/kpauly/feedie/releases"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            macOS (Apple Silicon)
+                        </a>
+                        <a
+                            class="cta ghost"
+                            id="download-mac-intel"
+                            href="https://github.com/kpauly/feedie/releases"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            macOS (Intel)
+                        </a>
+                        <a
+                            class="cta ghost"
+                            id="download-linux-x86"
+                            href="https://github.com/kpauly/feedie/releases"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            Linux (x86_64)
+                        </a>
+                        <a
+                            class="cta ghost"
+                            id="download-linux-arm"
+                            href="https://github.com/kpauly/feedie/releases"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            Linux (ARM64)
+                        </a>
+                    </div>
+                    <p
+                        class="version"
+                        id="release-label"
+                        data-loading="Loading latest release..."
+                        data-prefix="Latest release"
+                        data-fallback="Latest release unavailable - see GitHub releases."
+                    >
+                        Loading latest release...
+                    </p>
+                </div>
+                <div class="hero-image">
+                    <img
+                        src="assets/feedie-banner.png"
+                        alt="Feedie app banner"
+                    />
+                </div>
+            </div>
+        </header>
+        <main>
+            <section id="about" class="section about">
+                <div class="section-heading">
+                    <span>About Feedie</span>
+                    <h2>A helpful assistant for feeder camera photos</h2>
+                </div>
+                <p>
+                    Feeder cameras often generate hundreds of images without an
+                    easy way to sort them. Feedie is built for families,
+                    schools, and nature lovers who just want to see who visited
+                    their garden. Everything runs locally, no cloud account is
+                    required, and the UI stays clear with simple tabs.
+                </p>
+                <ul class="feature-list">
+                    <li>
+                        Species detection runs on a normal laptop - no GPU
+                        required.
+                    </li>
+                    <li>
+                        Photos are grouped into <em>Present</em>,
+                        <em>Empty</em>, and <em>Uncertain</em> galleries.
+                    </li>
+                    <li>
+                        Export photos (single or bulk) into folders per species.
+                    </li>
+                    <li>
+                        Optional CSV export, ready to import into
+                        waarneming(en).be/nl.
+                    </li>
+                    <li>
+                        Optional automatic uploads of relabeled photos to
+                        Roboflow to improve the model.
+                    </li>
+                    <li>Optional recursive scans and cached results.</li>
+                </ul>
+            </section>
+
+            <section id="background" class="section split">
+                <div class="split-text">
+                    <h2>Background and motivation</h2>
+                    <p>
+                        Many existing tools are complex, often lack Dutch
+                        support, and use a lot of memory. Feedie keeps the
+                        install small, runs fast on a normal CPU, and is tuned
+                        for common species in Belgium and the Netherlands. That
+                        means less time sorting and more time enjoying your
+                        visitors.
+                    </p>
+                    <p><b>Tips:</b></p>
+                    <ul class="feature-list">
+                        <li>
+                            Increase the variety of species by placing the
+                            camera in a wilder garden corner and changing food
+                            types.
+                        </li>
+                        <li>
+                            Plant native flowers, shrubs, and trees to attract
+                            insects and birds.
+                        </li>
+                        <li>
+                            No garden? City birds still bring surprises to
+                            feeder cameras.
+                        </li>
+                    </ul>
+                </div>
+                <div class="split-media">
+                    <img
+                        src="assets/Schermafbeelding 2025-11-24 193336.png"
+                        alt="Overview of detected species in Feedie"
+                    />
+                </div>
+            </section>
+
+            <section id="download" class="section download">
+                <div class="section-heading">
+                    <span>Download and install</span>
+                    <h2>Step by step</h2>
+                </div>
+                <div class="download-grid">
+                    <div>
+                        <h3>Windows</h3>
+                        <ol>
+                            <li>
+                                Download the installer via the button above.
+                            </li>
+                            <li>
+                                Double-click
+                                <strong>FeedieSetup-&lt;version&gt;.exe</strong
+                                >.
+                            </li>
+                            <li>
+                                Accept the security prompt (unknown publisher)
+                                and follow the wizard.
+                            </li>
+                            <li>Find Feedie in the Start menu.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <h3>macOS</h3>
+                        <ol>
+                            <li>
+                                Download
+                                <strong
+                                    >Feedie-mac-&lt;arch&gt;-&lt;version&gt;.zip</strong
+                                >.
+                            </li>
+                            <li>
+                                Open the zip and drag
+                                <strong>Feedie.app</strong> to
+                                <em>Applications</em>.
+                            </li>
+                            <li>
+                                Open Feedie from Launchpad. Right-click to
+                                accept the warning on first launch.
+                            </li>
+                        </ol>
+                    </div>
+                    <div>
+                        <h3>Linux</h3>
+                        <ol>
+                            <li>
+                                Download
+                                <strong
+                                    >Feedie-linux-x86_64-&lt;version&gt;.AppImage</strong
+                                >
+                                or
+                                <strong
+                                    >Feedie-linux-aarch64-&lt;version&gt;.AppImage</strong
+                                >
+                                (Chromebook/ARM64).
+                            </li>
+                            <li>
+                                Make it executable with
+                                <strong>chmod +x</strong>.
+                            </li>
+                            <li>Run the AppImage from your file manager.</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="download-note">
+                    <h3>Chromebook (ARM64)</h3>
+                    <ol>
+                        <li>Enable Linux (Crostini) in ChromeOS Settings.</li>
+                        <li>
+                            Update packages:
+                            <code
+                                >sudo apt update &amp;&amp; sudo apt -y
+                                upgrade</code
+                            >.
+                        </li>
+                        <li>
+                            Install runtime libs:
+                            <code>
+                                sudo apt install -y libgtk-3-0 libx11-6
+                                libxkbcommon0 libxrandr2 libxinerama1
+                                libxcursor1 libxi6 libgl1
+                            </code>
+                        </li>
+                        <li>
+                            Copy the AppImage from Downloads:
+                            <code>
+                                cp
+                                /mnt/chromeos/MyFiles/Downloads/Feedie-linux-aarch64-&lt;version&gt;.AppImage
+                                ~/
+                            </code>
+                        </li>
+                        <li>
+                            Launch Feedie:
+                            <code>
+                                chmod +x
+                                ~/Feedie-linux-aarch64-&lt;version&gt;.AppImage
+                                &amp;&amp;
+                                ~/Feedie-linux-aarch64-&lt;version&gt;.AppImage
+                            </code>
+                        </li>
+                    </ol>
+                </div>
+                <p>
+                    On first launch Feedie copies the bundled model into your
+                    user profile. You can scan immediately without creating an
+                    account or being online.
+                </p>
+            </section>
+
+            <section id="usage" class="section usage">
+                <div class="section-heading">
+                    <span>How it works</span>
+                    <h2>From SD card to tidy species folders</h2>
+                </div>
+                <div class="usage-steps">
+                    <article>
+                        <img
+                            src="assets/Schermafbeelding 2025-11-21 125008.png"
+                            alt="Choose photo folder"
+                        />
+                        <h3>1. Choose your photo folder</h3>
+                        <p>
+                            Select the SD-card folder (for best performance,
+                            copy it to your hard drive first). Feedie counts the
+                            files and enables scanning. If the folder was
+                            scanned before, cached results can be opened
+                            instantly.
+                        </p>
+                    </article>
+                    <article>
+                        <img
+                            src="assets/Schermafbeelding 2025-11-21 125021.png"
+                            alt="Gallery results"
+                        />
+                        <h3>2. Scan the folder</h3>
+                        <p>
+                            Feedie shows scanning progress. Large cards take
+                            some time, but expect roughly 10-20 seconds per 100
+                            photos on a typical laptop.
+                        </p>
+                    </article>
+                    <article>
+                        <img
+                            src="assets/Schermafbeelding 2025-11-24 194539.png"
+                            alt="Labels and filters"
+                        />
+                        <h3>3. Review and adjust</h3>
+                        <p>
+                            Use <em>Present</em>, <em>Empty</em>, and
+                            <em>Uncertain</em> tabs to review results. Navigate
+                            with PgUp/Dn and Ctrl/Cmd shortcuts. Select one or
+                            more photos and right-click for actions.
+                        </p>
+                    </article>
+                    <article>
+                        <img
+                            src="assets/Schermafbeelding 2025-11-21 125308.png"
+                            alt="Photo viewer"
+                        />
+                        <h3>4. View full-resolution photos</h3>
+                        <p>
+                            Double-click a photo in the gallery to open the
+                            viewer. Use arrow keys to move through the gallery,
+                            and use right-click actions on the focused photo.
+                        </p>
+                    </article>
+                    <article class="placeholder">
+                        <img
+                            src="assets/Schermafbeelding 2025-11-21 125634.png"
+                            alt="Export dialog"
+                        />
+                        <h3>5. Export neatly</h3>
+                        <p>
+                            Select the galleries you want to export, pick a
+                            destination, and Feedie writes folders per species.
+                            Add CSV export to upload results to Waarnemingen.
+                        </p>
+                    </article>
+                    <article class="placeholder">
+                        <img
+                            src="assets/Schermafbeelding 2025-11-21 204631.png"
+                            alt="Settings dialog"
+                        />
+                        <h3>6. Stay in control</h3>
+                        <p>
+                            In <em>Settings</em> you can adjust the confidence
+                            threshold, background labels, and language. Versions
+                            are shown at the bottom. On Windows, app updates can
+                            be installed directly.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="license" class="section license">
+                <div class="section-heading">
+                    <span>License</span>
+                    <h2>Free for non-commercial use</h2>
+                </div>
+                <p>
+                    Feedie is distributed under the PolyForm Noncommercial
+                    License 1.0.0. You can use and modify the app for personal
+                    or educational use. For commercial licensing, contact the
+                    maintainers on GitHub.
+                </p>
+            </section>
+        </main>
+        <footer>
+            <p>
+                2024 <span id="current-year"></span> Feedie - built with love
+                for backyard species.
+            </p>
+            <p>
+                <a
+                    href="https://github.com/kpauly/feedie/issues"
+                    target="_blank"
+                    rel="noopener"
+                >
+                    Feedback or bug reports? Let us know.
+                </a>
+            </p>
+            <a
+                href="https://github.com/kpauly/feedie"
+                target="_blank"
+                rel="noopener"
+            >
+                View the source on GitHub
+            </a>
+        </footer>
+        <script src="script.js"></script>
+    </body>
+</html>

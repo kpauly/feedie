@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Feedie – Tuinsoorten herkennen met een voederhuiscamera</title>
+        <title>Feedie - Tuinsoorten herkennen met een voederhuiscamera</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link
@@ -21,11 +21,17 @@
                     <img src="assets/feedie-icon.png" alt="Feedie icoon" />
                     <span>Feedie</span>
                 </div>
-                <div class="nav-links">
-                    <a href="#about">Over Feedie</a>
-                    <a href="#download">Download</a>
-                    <a href="#usage">Zo werkt het</a>
-                    <a href="#license">Licentie</a>
+                <div class="nav-right">
+                    <div class="nav-links">
+                        <a href="#about">Over Feedie</a>
+                        <a href="#download">Download</a>
+                        <a href="#usage">Zo werkt het</a>
+                        <a href="#license">Licentie</a>
+                    </div>
+                    <div class="nav-lang" aria-label="Taal">
+                        <a class="lang active" href="index.html">NL</a>
+                        <a class="lang" href="en.html">EN</a>
+                    </div>
                 </div>
             </nav>
             <div class="hero-content">
@@ -35,10 +41,11 @@
                     </p>
                     <h1>Haal het beste uit je voederhuiscamera</h1>
                     <p>
-                        Feedie is een lichte Windows- en Mac-app in het
-                        Nederlands. In een paar klikken scan je hele SD-kaarten,
+                        Feedie is een lichte Windows-, macOS- en Linux-app
+                        (AppImage). In een paar klikken scan je hele SD-kaarten,
                         zie je direct welke bezoekers langskwamen en exporteer
-                        je de mooiste foto’s.
+                        je de mooiste foto's. De interface is beschikbaar in
+                        Nederlands, Engels, Frans, Duits, Spaans en Zweeds.
                     </p>
                     <div class="cta-group">
                         <a
@@ -68,9 +75,33 @@
                         >
                             macOS (Intel)
                         </a>
+                        <a
+                            class="cta ghost"
+                            id="download-linux-x86"
+                            href="https://github.com/kpauly/feedie/releases"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            Linux (x86_64)
+                        </a>
+                        <a
+                            class="cta ghost"
+                            id="download-linux-arm"
+                            href="https://github.com/kpauly/feedie/releases"
+                            target="_blank"
+                            rel="noopener"
+                        >
+                            Linux (ARM64)
+                        </a>
                     </div>
-                    <p class="version" id="release-label">
-                        Laatste versie wordt opgehaald…
+                    <p
+                        class="version"
+                        id="release-label"
+                        data-loading="Laatste versie wordt opgehaald..."
+                        data-prefix="Laatste versie"
+                        data-fallback="Laatste versie onbekend - bekijk de releases op GitHub."
+                    >
+                        Laatste versie wordt opgehaald...
                     </p>
                 </div>
                 <div class="hero-image">
@@ -85,10 +116,10 @@
             <section id="about" class="section about">
                 <div class="section-heading">
                     <span>Over Feedie</span>
-                    <h2>Een handige assistent voor voederhuiscamera’s</h2>
+                    <h2>Een handige assistent voor voederhuiscamera's</h2>
                 </div>
                 <p>
-                    Veel voederhuiscamera’s leveren honderden foto’s zonder
+                    Veel voederhuiscamera's leveren honderden foto's zonder
                     hulpmiddel om de beelden te sorteren. Feedie is gebouwd voor
                     gezinnen, scholen en natuurliefhebbers die gewoon een laptop
                     hebben en snel willen zien wie er op bezoek kwam. De app
@@ -105,7 +136,7 @@
                         <em>Aanwezig</em>, <em>Leeg</em> en <em>Onzeker</em>.
                     </li>
                     <li>
-                        Exporteer foto’s (individueel of in bulk) geordend in
+                        Exporteer foto's (individueel of in bulk) geordend in
                         mappen per soort.
                     </li>
                     <li>
@@ -113,58 +144,46 @@
                         waarneming(en).be/nl.
                     </li>
                     <li>
-                        Optioneel (maar warm aanbevolen!) automatische upload
-                        van gelabelde foto's naar Roboflow voor wie de
-                        soortherkenning wil helpen verbeteren.
+                        Optioneel automatische upload van gelabelde foto's naar
+                        Roboflow om de soortherkenning te verbeteren.
+                    </li>
+                    <li>
+                        Scan optioneel submappen en heropen eerdere resultaten
+                        via de cache.
                     </li>
                 </ul>
             </section>
 
             <section id="background" class="section split">
                 <div class="split-text">
-                    <h2>Achtergrond & motivatie</h2>
+                    <h2>Achtergrond en motivatie</h2>
                     <p>
                         Tijdens de zoektocht naar software voor eenvoudige
-                        voederhuiscamera’s bleek dat bestaande pakketten
+                        voederhuiscamera's bleek dat bestaande pakketten
                         ingewikkeld zijn, vaak geen Nederlands ondersteunen en
                         veel geheugen vragen. Feedie pakt dit anders aan: kleine
-                        installatie, supersnel op een gewone laptopprocessor en
-                        afgestemd op de soorten in België en Nederland. Zo
+                        installatie, snel op een gewone laptopprocessor en
+                        afgestemd op de soorten in Belgie en Nederland. Zo
                         besteed je minder tijd aan filteren en meer tijd aan het
                         bewonderen van je tuinbezoekers.
                     </p>
-                    <p>
-                        <b>Tips:</b>
-                    </p>
+                    <p><b>Tips:</b></p>
                     <ul class="feature-list">
                         <li>
-                            Verhoog je kans om veel soorten vast te leggen door
-                            de camera in een verwilderde hoek van de tuin te
-                            plaatsen, wissel af in het voedselaanbod en zet je
-                            voederhuiscamera ook af en toe op de grond. Zo trek
-                            je telkens andere bezoekers aan en krijg je
-                            misschien zelfs een eekhoorn, muis of egel voor de
-                            lens.
+                            Verhoog je kans op veel soorten door de camera in
+                            een verwilderde hoek van de tuin te plaatsen, af te
+                            wisselen in het voedselaanbod en de camera ook eens
+                            op de grond te zetten.
                         </li>
                         <li>
-                            Zorg voor veel verschillende bloeiende en
-                            vruchtdragende inheemse kruiden, struiken en bomen
-                            die thuishoren in je regio. Die trekken op hun beurt
-                            veel insecten aan en zorgen voor een gezonde bodem,
-                            de basis voor een soortenrijke tuin.
+                            Zorg voor veel inheemse kruiden, struiken en bomen
+                            die passen in je regio. Dat trekt insecten aan en
+                            helpt een soortenrijke tuin.
                         </li>
                         <li>
-                            Gebruik je geen kunstmest of pesticiden, en laat je
-                            bladafval of een takkenhoop liggen? Prima! Dit heet
-                            klapstoelbeheer: laat de natuur het werk doen en
-                            geniet ervan ;-)
-                        </li>
-                        <li>
-                            Geen tuin? Ook prima! Laat het je vooral niet
-                            tegenhouden om toch een voederhuiscamera te
-                            plaatsen. Een aantal vogelsoorten voelt zich heel
-                            goed thuis in de stad, en af en toe ga je toch
-                            verrassende bezoekers waarnemen.
+                            Geen tuin? Ook prima. Een aantal vogelsoorten voelt
+                            zich goed thuis in de stad en zorgt toch voor
+                            verrassende bezoekers.
                         </li>
                     </ul>
                 </div>
@@ -178,7 +197,7 @@
 
             <section id="download" class="section download">
                 <div class="section-heading">
-                    <span>Download & installatie</span>
+                    <span>Download en installatie</span>
                     <h2>Stap voor stap aan de slag</h2>
                 </div>
                 <div class="download-grid">
@@ -191,7 +210,7 @@
                             </li>
                             <li>
                                 Dubbelklik op
-                                <strong>FeedieSetup-…​.exe</strong>.
+                                <strong>FeedieSetup-&lt;versie&gt;.exe</strong>.
                             </li>
                             <li>
                                 Bevestig de beveiligingsmelding (onbekende
@@ -204,12 +223,15 @@
                         <h3>macOS</h3>
                         <ol>
                             <li>
-                                Download de <strong>Feedie-mac-…​.zip</strong>.
+                                Download de
+                                <strong
+                                    >Feedie-mac-&lt;arch&gt;-&lt;versie&gt;.zip</strong
+                                >.
                             </li>
                             <li>
                                 Open de zip en sleep
                                 <strong>Feedie.app</strong> naar
-                                <em>Programma’s</em>.
+                                <em>Programma's</em>.
                             </li>
                             <li>
                                 Open Feedie via Launchpad. Rechts-klik om de
@@ -218,6 +240,68 @@
                             </li>
                         </ol>
                     </div>
+                    <div>
+                        <h3>Linux</h3>
+                        <ol>
+                            <li>
+                                Download
+                                <strong
+                                    >Feedie-linux-x86_64-&lt;versie&gt;.AppImage</strong
+                                >
+                                of
+                                <strong
+                                    >Feedie-linux-aarch64-&lt;versie&gt;.AppImage</strong
+                                >
+                                (Chromebook/ARM64).
+                            </li>
+                            <li>
+                                Maak het bestand uitvoerbaar met
+                                <strong>chmod +x</strong>.
+                            </li>
+                            <li>Start de AppImage vanuit je bestandsbeheer.</li>
+                        </ol>
+                    </div>
+                </div>
+                <div class="download-note">
+                    <h3>Chromebook (ARM64)</h3>
+                    <ol>
+                        <li>
+                            Zet Linux (Crostini) aan via de ChromeOS
+                            instellingen.
+                        </li>
+                        <li>
+                            Werk het systeem bij:
+                            <code
+                                >sudo apt update &amp;&amp; sudo apt -y
+                                upgrade</code
+                            >.
+                        </li>
+                        <li>
+                            Installeer de benodigdheden:
+                            <code>
+                                sudo apt install -y libgtk-3-0 libx11-6
+                                libxkbcommon0 libxrandr2 libxinerama1
+                                libxcursor1 libxi6 libgl1
+                            </code>
+                        </li>
+                        <li>
+                            Kopieer de AppImage uit Downloads:
+                            <code>
+                                cp
+                                /mnt/chromeos/MyFiles/Downloads/Feedie-linux-aarch64-&lt;versie&gt;.AppImage
+                                ~/
+                            </code>
+                        </li>
+                        <li>
+                            Start Feedie:
+                            <code>
+                                chmod +x
+                                ~/Feedie-linux-aarch64-&lt;versie&gt;.AppImage
+                                &amp;&amp;
+                                ~/Feedie-linux-aarch64-&lt;versie&gt;.AppImage
+                            </code>
+                        </li>
+                    </ol>
                 </div>
                 <p>
                     Bij de eerste start kopieert Feedie automatisch het
@@ -243,11 +327,9 @@
                             Selecteer de fotomap van je SD-kaart (voor de beste
                             prestaties kopieer je die best eerst naar de harde
                             schijf). Feedie telt alle bestanden en toont je de
-                            knop om het scannen te starten. Heb je de
-                            geselecteerde map reeds eerder gescand, dan toont
-                            Feedie met welke modelversie dat was en kan je
-                            meteen door naar de laatste resultaten, of kan je
-                            opnieuw starten.
+                            knop om het scannen te starten. Heb je de map al
+                            eerder gescand, dan kan je meteen verder met de
+                            vorige resultaten via de cache.
                         </p>
                     </article>
                     <article>
@@ -257,10 +339,10 @@
                         />
                         <h3>2. Scan de map om soorten te herkennen</h3>
                         <p>
-                            Feedie toont de voortgang van het scannen.
-                            Afhankelijk van het aantal foto's op je SD kaart kan
-                            dit enige tijd durenn, maar verwacht ongeveer 10
-                            seconden per 100 foto's.
+                            Feedie toont de voortgang van het scannen. Voor
+                            grote kaarten duurt dit even, maar verwacht grofweg
+                            10 tot 20 seconden per 100 foto's op een standaard
+                            laptop.
                         </p>
                     </article>
                     <article>
@@ -272,21 +354,11 @@
                         <p>
                             Gebruik de tabbladen <em>Aanwezig</em>,
                             <em>Leeg</em> en <em>Onzeker</em> om snel foto's te
-                            vinden waar met zekerheid gekende soorten in
-                            voorkomen, waar Feedie nog onzeker over is, of die
-                            wellicht geen diersoorten bevatten. Navigeer
-                            intuïtief met toetsen: PgUp/Dn voert je door de
-                            pagina's in een galerij, ctrl/cmd-PgUp/Dn brengt je
-                            naar de eerste of laatste pagina in een galerij,
-                            ctrl/cmd-home/end brengt je naar de start of het
-                            eind van een pagina. Selecteren kan je met shift
-                            ingedrukt houden in combinatie met de
-                            navigatietoetsen. Je kan ook net als in Windows
-                            Verkenner of macOS Finder één of meerdere foto's
-                            selecteren en rechts klikken voor acties. Exporteer
-                            geselecteerde bestanden, wijzig de labels of voer
-                            een nieuwe naam in. Pas je een label aan, dan
-                            verhuist de foto naar de overeenkomstige galerij.
+                            vinden. Navigeer met toetsen: PgUp/Dn voor pagina's,
+                            Ctrl/Cmd-PgUp/Dn naar het begin of einde,
+                            Ctrl/Cmd-Home/End naar de randen van een pagina. Je
+                            kan net als in de bestandsverkenner een of meerdere
+                            foto's selecteren en rechts klikken voor acties.
                         </p>
                     </article>
                     <article>
@@ -297,11 +369,10 @@
                         <h3>4. Bekijk foto's op volledige resolutie</h3>
                         <p>
                             Dubbelklik op een foto in een galerij om die op
-                            oorspronkelijke grootte te bekijken. Je kan met de
-                            pijltjestoetsen links en rechts vlot door elke foto
-                            in de gallerij scrollen. Dezelfde acties als in de
-                            galerijen zijn via rechtermuisklik beschikbaar voor
-                            de weergegeven foto.
+                            oorspronkelijke grootte te bekijken. Gebruik de
+                            pijltjestoetsen om door de galerij te bladeren. Via
+                            de rechtermuisklik zijn dezelfde acties beschikbaar
+                            als in de overzichtsgalerij.
                         </p>
                     </article>
                     <article class="placeholder">
@@ -313,16 +384,8 @@
                         <p>
                             Wil je alle foto's uit een galerij opslaan? Vink de
                             gewenste galerij(en) aan, kies een exportfolder en
-                            Feedie slaat ze er gesorteerd op. Zo komen foto's
-                            uit de <em>Aanwezig</em> galerij terecht in een
-                            aparte folder per gevonden soort. Op deze manier kan
-                            je in één keer alle interessante foto's behouden.
-                            Wil je alle gevonden soorten ook ineens op
-                            Waarnemingen.be of Waarneming.nl zetten? Vink dan
-                            Exporteer als CSV bestand aan. Kopieer de
-                            locatiecoördinaten, en je kan het bekomen CSV
-                            bestand rechtstreeks online in je Waarnemingen
-                            account importeren.
+                            Feedie slaat ze er gesorteerd op. Voeg CSV export
+                            toe om resultaten naar Waarnemingen te sturen.
                         </p>
                     </article>
                     <article class="placeholder">
@@ -333,26 +396,10 @@
                         <h3>6. Behoud de controle</h3>
                         <p>
                             In het <em>Instellingen</em> scherm kan je de
-                            zekerheidsdrempel aanpassen. Standaard staat dit nog
-                            op 50% (ter vergelijking: Obsidentify beschouwt een
-                            herkenning pas als zeker vanaf 90%), maar wanneer je
-                            dit wijzigt en op Herbereken klikt, past Feedie de
-                            galerijen automatisch aan. Onderaan het scherm zie
-                            je met welke versie van de software en het
-                            herkenningsmodel Feedie momenteel werkt. Je krijgt
-                            er automatisch een downloadlink wanneer er updates
-                            beschikbaar zijn. De beste ervaring heb je steeds
-                            met de meest recente versies, maar de app blijft
-                            altijd werken. De optie
-                            <b>Help de herkenning te verbeteren</b> staat
-                            standaard uit, maar is warm aan te bevelen: het
-                            zorgt ervoor dat foto's waaraan een nieuw label werd
-                            toegekend automatisch toegevoegd worden aan de
-                            database om een nieuwe modelversie te trainen. Zo
-                            kunnen we bvb. zeker nog hulp gebruiken bij het
-                            leren herkennen van foto's in infraroodmodus
-                            (zwart/witfoto's die bij duisternis opgenomen
-                            worden).
+                            zekerheidsdrempel aanpassen, de achtergrondlabels
+                            kiezen en de taal instellen. Onderaan zie je de app-
+                            en modelversies. Op Windows kan je updates direct
+                            laten installeren.
                         </p>
                     </article>
                 </div>
@@ -374,7 +421,7 @@
         </main>
         <footer>
             <p>
-                © <span id="current-year"></span> Feedie — gebouwd met liefde
+                2024 <span id="current-year"></span> Feedie - gebouwd met liefde
                 voor tuinsoorten.
             </p>
             <p>
@@ -383,7 +430,7 @@
                     target="_blank"
                     rel="noopener"
                 >
-                    Klachten, tips of feedback? Laat het ons weten!
+                    Klachten, tips of feedback? Laat het ons weten.
                 </a>
             </p>
             <a

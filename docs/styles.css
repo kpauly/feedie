@@ -49,6 +49,13 @@ a {
     flex-wrap: wrap;
 }
 
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
 .logo {
     display: flex;
     align-items: center;
@@ -77,6 +84,27 @@ a {
 
 .nav-links a:hover {
     color: var(--white);
+}
+
+.nav-lang {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.nav-lang .lang {
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+
+.nav-lang .lang.active {
+    background: var(--white);
+    color: var(--blue-dark);
 }
 
 .hero-content {
@@ -186,7 +214,7 @@ main {
 }
 
 .feature-list li::before {
-    content: "•";
+    content: "*";
     position: absolute;
     left: 0;
     color: var(--blue-dark);
@@ -208,6 +236,14 @@ main {
 }
 
 .download-grid ol {
+    padding-left: 1.25rem;
+}
+
+.download-note {
+    margin-top: 1.5rem;
+}
+
+.download-note ol {
     padding-left: 1.25rem;
 }
 
@@ -246,7 +282,7 @@ footer a {
 }
 
 @media (max-width: 640px) {
-    .nav-links {
+    .nav-right {
         flex-direction: column;
         align-items: flex-start;
     }

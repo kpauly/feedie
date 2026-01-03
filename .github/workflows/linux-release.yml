@@ -8,9 +8,21 @@ on:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
     env:
       CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-22.04
+            linuxdeploy_url: https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+            appimagetool_url: https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          - arch: aarch64
+            runner: ubuntu-22.04-arm
+            linuxdeploy_url: https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-aarch64.AppImage
+            appimagetool_url: https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-aarch64.AppImage
 
     steps:
       - name: Checkout
@@ -69,20 +81,21 @@ jobs:
         run: |
           mkdir -p tools
           curl -L -o tools/linuxdeploy.AppImage \
-            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+            ${{ matrix.linuxdeploy_url }}
           curl -L -o tools/appimagetool.AppImage \
-            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+            ${{ matrix.appimagetool_url }}
           chmod +x tools/*.AppImage
           echo "${GITHUB_WORKSPACE}/tools" >> "$GITHUB_PATH"
 
       - name: Build AppImage
         env:
           FEEDIE_VERSION: ${{ env.FEEDIE_VERSION }}
+          FEEDIE_APPIMAGE_ARCH: ${{ matrix.arch }}
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: ./scripts/build_appimage.sh
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Feedie-linux-x86_64-${{ env.FEEDIE_VERSION }}
-          path: dist/Feedie-linux-x86_64-${{ env.FEEDIE_VERSION }}.AppImage
+          name: Feedie-linux-${{ matrix.arch }}-${{ env.FEEDIE_VERSION }}
+          path: dist/Feedie-linux-${{ matrix.arch }}-${{ env.FEEDIE_VERSION }}.AppImage
