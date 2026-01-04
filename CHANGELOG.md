@@ -2,9 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-## [1.3.0] - 2026-01-03
+## [1.3.0] - 2026-01-04
 
 ### Added
 - Fluent-based localization with system auto-detect, language override, and native language names in the dropdown (issue #10).

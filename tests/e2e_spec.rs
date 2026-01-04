@@ -96,3 +96,24 @@ fn e2e_scenario_9_cached_scan_reopen_folder() {
     // And the Scan button remains enabled so the user can rescan and refresh the cache
     todo!("Implement Scenario 9 E2E");
 }
+
+#[test]
+#[ignore = "E2E not implemented; see specs/scenarios.md"]
+fn e2e_scenario_10_language_selection() {
+    // Scenario 10: Language selection
+    // Given the Settings panel is open
+    // When the user selects a language from the dropdown
+    // Then UI strings update to the selected language
+    // And the preference is remembered on next launch
+    todo!("Implement Scenario 10 E2E");
+}
+
+#[test]
+#[ignore = "E2E not implemented; see specs/scenarios.md"]
+fn e2e_scenario_11_recursive_scan_toggle() {
+    // Scenario 11: Recursive scan toggle
+    // Given the user enables "Include subfolders" in the Photo folder tab
+    // When the user scans a folder with nested subfolders
+    // Then images in subfolders are included in the scan results
+    todo!("Implement Scenario 11 E2E");
+}

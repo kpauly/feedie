@@ -137,7 +137,7 @@
                     </li>
                     <li>
                         Optional CSV export, ready to import into
-                        waarneming(en).be/nl.
+                        observation.org.
                     </li>
                     <li>
                         Optional automatic uploads of relabeled photos to
@@ -151,7 +151,7 @@
                 <div class="split-text">
                     <h2>Background and motivation</h2>
                     <p>
-                        Many existing tools are complex, often lack Dutch
+                        Many existing tools are complex, often lack language
                         support, and use a lot of memory. Feedie keeps the
                         install small, runs fast on a normal CPU, and is tuned
                         for common species in Belgium and the Netherlands. That
@@ -163,7 +163,9 @@
                         <li>
                             Increase the variety of species by placing the
                             camera in a wilder garden corner and changing food
-                            types.
+                            types. Snow and ice days increase the abundance of
+                            observations. Be sure to offer a variety of
+                            unspoiled food.
                         </li>
                         <li>
                             Plant native flowers, shrubs, and trees to attract
@@ -177,7 +179,7 @@
                 </div>
                 <div class="split-media">
                     <img
-                        src="assets/Schermafbeelding 2025-11-24 193336.png"
+                        src="assets/General_EN.png"
                         alt="Overview of detected species in Feedie"
                     />
                 </div>
@@ -261,7 +263,7 @@
                             >.
                         </li>
                         <li>
-                            Install runtime libs:
+                            Install runtime libs if not already satisfied:
                             <code>
                                 sudo apt install -y libgtk-3-0 libx11-6
                                 libxkbcommon0 libxrandr2 libxinerama1
@@ -280,17 +282,12 @@
                             Launch Feedie:
                             <code>
                                 chmod +x
-                                ~/Feedie-linux-aarch64-&lt;version&gt;.AppImage
+                                ~/Feedie-linux-&lt;architecture&gt;-&lt;version&gt;.AppImage
                                 &amp;&amp;
-                                ~/Feedie-linux-aarch64-&lt;version&gt;.AppImage
+                                ~/Feedie-linux-&lt;architecture&gt;-&lt;version&gt;.AppImage
                             </code>
                         </li>
                     </ol>
-                    <p>
-                        If clicks feel offset, run once with
-                        <code>WINIT_UNIX_BACKEND=x11 GDK_BACKEND=x11</code> to
-                        force X11.
-                    </p>
                 </div>
                 <p>
                     On first launch Feedie copies the bundled model into your
@@ -307,33 +304,30 @@
                 <div class="usage-steps">
                     <article>
                         <img
-                            src="assets/Schermafbeelding 2025-11-21 125008.png"
+                            src="assets/Stap1_EN.png"
                             alt="Choose photo folder"
                         />
                         <h3>1. Choose your photo folder</h3>
                         <p>
-                            Select the SD-card folder (for best performance,
-                            copy it to your hard drive first). Feedie counts the
-                            files and enables scanning. If the folder was
-                            scanned before, cached results can be opened
-                            instantly.
+                            Select the SD-card folder and choose whether to
+                            include subfolders (for best performance, copy it to
+                            your hard drive first). Feedie counts the files and
+                            enables scanning. If the folder was scanned before,
+                            cached results can be opened instantly.
                         </p>
                     </article>
                     <article>
-                        <img
-                            src="assets/Schermafbeelding 2025-11-21 125021.png"
-                            alt="Gallery results"
-                        />
+                        <img src="assets/Stap2_EN.png" alt="Gallery results" />
                         <h3>2. Scan the folder</h3>
                         <p>
-                            Feedie shows scanning progress. Large cards take
-                            some time, but expect roughly 10-20 seconds per 100
+                            Feedie shows scanning progress. Large folders take
+                            some time, but expect roughly 5-10 seconds per 100
                             photos on a typical laptop.
                         </p>
                     </article>
                     <article>
                         <img
-                            src="assets/Schermafbeelding 2025-11-24 194539.png"
+                            src="assets/Stap3_EN.png"
                             alt="Labels and filters"
                         />
                         <h3>3. Review and adjust</h3>
@@ -345,10 +339,7 @@
                         </p>
                     </article>
                     <article>
-                        <img
-                            src="assets/Schermafbeelding 2025-11-21 125308.png"
-                            alt="Photo viewer"
-                        />
+                        <img src="assets/Stap4_EN.png" alt="Photo viewer" />
                         <h3>4. View full-resolution photos</h3>
                         <p>
                             Double-click a photo in the gallery to open the
@@ -357,22 +348,16 @@
                         </p>
                     </article>
                     <article class="placeholder">
-                        <img
-                            src="assets/Schermafbeelding 2025-11-21 125634.png"
-                            alt="Export dialog"
-                        />
+                        <img src="assets/Stap5_EN.png" alt="Export dialog" />
                         <h3>5. Export neatly</h3>
                         <p>
                             Select the galleries you want to export, pick a
                             destination, and Feedie writes folders per species.
-                            Add CSV export to upload results to Waarnemingen.
+                            Add CSV export to upload results to Observation.
                         </p>
                     </article>
                     <article class="placeholder">
-                        <img
-                            src="assets/Schermafbeelding 2025-11-21 204631.png"
-                            alt="Settings dialog"
-                        />
+                        <img src="assets/Stap6_EN.png" alt="Settings dialog" />
                         <h3>6. Stay in control</h3>
                         <p>
                             In <em>Settings</em> you can adjust the confidence

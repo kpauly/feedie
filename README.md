@@ -54,15 +54,16 @@ Feedie was born out of a need for a simple, efficient, and user-friendly tool to
 
 ```
 .
-├── assets/                # Branding and installer imagery
-├── manifest.json          # App + model version manifest consumed by the updater
-├── models/                # Bundled EfficientViT weights, labels, and version file
-├── crates/
-│   ├── app_gui/           # egui desktop application (Feedie)
-│   └── feeder_core/       # Core inference, scanning, and CSV utilities
-├── scripts/               # CI helper scripts (fmt, clippy, tests, spec checks)
-└── specs/                 # Product spec, tasks, and acceptance scenarios
+|-- assets/                # Branding and installer imagery
+|-- manifest.json          # App + model version manifest consumed by the updater
+|-- models/                # Bundled EfficientViT weights, labels, and version file
+|-- crates/
+|   |-- app_gui/           # egui desktop application (Feedie)
+|   `-- feeder_core/       # Core inference, scanning, and CSV utilities
+|-- scripts/               # CI helper scripts (fmt, clippy, tests, spec checks)
+`-- specs/                 # Product spec, tasks, and acceptance scenarios
 ```
+
 
 - `crates/app_gui`: Uses `eframe/egui` for the desktop UI, handles scanning, manifest fetching, and model download/installation.
 - `crates/feeder_core`: Library with `scan_folder_with`, `EfficientVitClassifier`, and export helpers, reusable in other tools.
@@ -73,24 +74,23 @@ Feedie was born out of a need for a simple, efficient, and user-friendly tool to
 
 1. Download the latest release for your platform:
    - **Windows (Intel/AMD)**: `FeedieSetup-<version>.exe`
-   - **macOS Apple Silicon (M1/M2/M3)**: `Feedie-mac-arm64-<version>.zip`
+   - **macOS Apple Silicon**: `Feedie-mac-arm64-<version>.zip`
    - **macOS Intel**: `Feedie-mac-intel-<version>.zip`
    - **Linux (x86_64 AppImage)**: `Feedie-linux-x86_64-<version>.AppImage`
-   - **Linux (ARM64/AppImage)**: `Feedie-linux-aarch64-<version>.AppImage` (Chromebook / ARM laptops)
+   - **Linux (ARM64 AppImage)**: `Feedie-linux-aarch64-<version>.AppImage`
    - All downloads are available from the [latest release](https://github.com/kpauly/feedie/releases/latest).
-2. **Windows**: Run the installer. You may be warned a couple of times that you are about to install an app from an unknown publisher, but you can just accept. Feedie is installed to `C:\Program Files (x86)\Feedie`.
+2. **Windows**: Run the installer. You may be warned a couple of times that you are about to install an app from an unknown publisher, but you can just accept. Feedie is installed to `C:\Program Files\Feedie`. Henceforth, you can launch Feedie from the Start menu.
 **macOS**: Open the downloaded zip file, drag `Feedie.app` into `/Applications` and run Feedie from there (right-click to accept the warning on first run).
-**Linux**: Make the AppImage executable (`chmod +x Feedie-linux-x86_64-<version>.AppImage` or `chmod +x Feedie-linux-aarch64-<version>.AppImage`) and run it.
-3. Launch Feedie from the Start menu. The bundled model is copied to your user data directory on first run so you can work offline immediately.
-The Instellingen tab will show your currently installed app/model versions and automatically check for available updates.
+**Linux**: Make the AppImage executable (`chmod +x Feedie-linux-<architecture>-<version>.AppImage`) and run it.
+3. The bundled model is copied to your user data directory on first run so you can work offline immediately.
+The Settings tab will show your currently installed app/model versions and automatically check for available updates.
 
-Chromebook (ARM64) quick start:
+Chromebook quick start:
 1. Enable Linux (Crostini) in ChromeOS Settings.
 2. In Terminal: `sudo apt update && sudo apt -y upgrade`
-3. Install runtime libs: `sudo apt install -y libgtk-3-0 libx11-6 libxkbcommon0 libxrandr2 libxinerama1 libxcursor1 libxi6 libgl1`
+3. Install runtime libs (if not already satisfied): `sudo apt install -y libgtk-3-0 libx11-6 libxkbcommon0 libxrandr2 libxinerama1 libxcursor1 libxi6 libgl1`
 4. Copy the AppImage from Downloads: `cp /mnt/chromeos/MyFiles/Downloads/Feedie-linux-aarch64-<version>.AppImage ~/`
-5. Run it: `chmod +x ~/Feedie-linux-aarch64-<version>.AppImage && ~/Feedie-linux-aarch64-<version>.AppImage`
-If the UI feels offset or clicks land in the wrong place, run once with `WINIT_UNIX_BACKEND=x11 GDK_BACKEND=x11` to force X11.
+5. Run it: `chmod +x ~/Feedie-linux-<architecture>-<version>.AppImage && ~/Feedie-linux-<architecture>-<version>.AppImage`
 
 > Prefer a portable build? Run `cargo build --release -p app_gui` and start `target\release\Feedie.exe`.
 
@@ -98,14 +98,14 @@ If the UI feels offset or clicks land in the wrong place, run once with `WINIT_U
 
 ## Using Feedie
 
-1. **Fotomap tab** - Point Feedie at your feeder cam SD-card dump folder. It shows how many frames were found and lets you start a scan (with optional recursive scan).
-2. **Scanresultaat tab** - Review `Aanwezig`, `Leeg`, and `Onzeker` galleries. Use the context menu for quick relabels, export of selected images, or double-click to open the preview window.
-3. **Exporteren tab** - Choose what to export:
+1. **Photo folder tab** - Point Feedie at your feeder cam SD-card dump folder. It shows how many frames were found and lets you start a scan (with optional recursive scan).
+2. **Results tab** - Review `Present`, `Empty`, and `Uncertain` galleries. Use the context menu for quick relabels, export of selected images, or double-click to open the preview window.
+3. **Export tab** - Choose what to export:
    - Species with confident detections (creates subfolders per species)
-   - All `Onzeker` samples (single `Onzeker` folder)
-   - All `Leeg` frames (single `Leeg` folder)
+   - All `Uncertain` samples (single `Uncertain` folder)
+   - All `Empty` frames (single `Empty` folder)
    - CSV with date/time/scientific name/lat/lng/path (camera GPS coordinates are prompted once per export)
-4. **Instellingen tab** - Adjust thresholds, background labels, language, and optional Roboflow uploads. The section at the bottom shows app/model versions and exposes download buttons when new versions are published (Windows can install app updates directly).
+4. **Settings tab** - Adjust thresholds, background labels, language, and optional Roboflow uploads. The section at the bottom shows app/model versions and exposes download buttons when new versions are published (Windows can install app updates directly).
 
 Documentation in `specs/` covers the product spec, tasks, and test scenarios if you want a deeper dive.
 
@@ -153,7 +153,7 @@ CI helper scripts:
 
 We welcome contributions and feedback! Ideas (non-exhaustive and in no particular order):
 
-- The most important contribution comes from just using the app with "Help het model te verbeteren" enabled. This will quickly grow the dataset to train improved model versions. Any usage feedback is also greatly appreciated.
+- The most important contribution comes from just using the app with "Help improve reconnect" enabled. This will quickly grow the dataset to train improved model versions. Any usage feedback is also greatly appreciated.
 - macOS and Linux testing and PRs that fix issues on these platforms
 - Add a "stats" tab to summarize/analyze scan results
 - Polish UI/UX and expand translations to additional languages by contributing Fluent `i18n/*.ftl` translations and localized species labels

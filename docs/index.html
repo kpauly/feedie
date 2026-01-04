@@ -41,11 +41,11 @@
                     </p>
                     <h1>Haal het beste uit je voederhuiscamera</h1>
                     <p>
-                        Feedie is een lichte Windows-, macOS- en Linux-app
-                        (AppImage). In een paar klikken scan je hele SD-kaarten,
-                        zie je direct welke bezoekers langskwamen en exporteer
-                        je de mooiste foto's. De interface is beschikbaar in
-                        Nederlands, Engels, Frans, Duits, Spaans en Zweeds.
+                        Feedie is een lichte Windows-, macOS- en Linux-app. In
+                        een paar klikken scan je hele SD-kaarten, zie je direct
+                        welke bezoekers langskwamen en exporteer je de mooiste
+                        foto's. De app is beschikbaar in Nederlands, Engels,
+                        Frans, Duits, Spaans en Zweeds.
                     </p>
                     <div class="cta-group">
                         <a
@@ -141,15 +141,15 @@
                     </li>
                     <li>
                         Optionele export naar CSV, klaar om te importeren op
-                        waarneming(en).be/nl.
+                        waarnemingen.be/waarneming.nl.
                     </li>
                     <li>
                         Optioneel automatische upload van gelabelde foto's naar
                         Roboflow om de soortherkenning te verbeteren.
                     </li>
                     <li>
-                        Scan optioneel submappen en heropen eerdere resultaten
-                        via de cache.
+                        Ook subfolders kunnen gescand worden, en eerdere
+                        resultaten blijven bewaard.
                     </li>
                 </ul>
             </section>
@@ -173,7 +173,9 @@
                             Verhoog je kans op veel soorten door de camera in
                             een verwilderde hoek van de tuin te plaatsen, af te
                             wisselen in het voedselaanbod en de camera ook eens
-                            op de grond te zetten.
+                            op de grond te zetten. Ook sneeuw- en ijsdagen zijn
+                            ideaal voor veel waarnemingen aan een voederhuis.
+                            Zorg voor gevarieerd en onbedorven voeder.
                         </li>
                         <li>
                             Zorg voor veel inheemse kruiden, struiken en bomen
@@ -277,7 +279,7 @@
                             >.
                         </li>
                         <li>
-                            Installeer de benodigdheden:
+                            Installeer de benodigdheden indien nog niet gebeurd:
                             <code>
                                 sudo apt install -y libgtk-3-0 libx11-6
                                 libxkbcommon0 libxrandr2 libxinerama1
@@ -296,17 +298,12 @@
                             Start Feedie:
                             <code>
                                 chmod +x
-                                ~/Feedie-linux-aarch64-&lt;versie&gt;.AppImage
+                                ~/Feedie-linux-&lt;architectuur&gt;-&lt;versie&gt;.AppImage
                                 &amp;&amp;
-                                ~/Feedie-linux-aarch64-&lt;versie&gt;.AppImage
+                                ~/Feedie-linux-&lt;architectuur&gt;-&lt;versie&gt;.AppImage
                             </code>
                         </li>
                     </ol>
-                    <p>
-                        Klikken die niet goed uitlijnen? Start een keer met
-                        <code>WINIT_UNIX_BACKEND=x11 GDK_BACKEND=x11</code> om
-                        X11 te forceren.
-                    </p>
                 </div>
                 <p>
                     Bij de eerste start kopieert Feedie automatisch het
@@ -323,18 +320,16 @@
                 </div>
                 <div class="usage-steps">
                     <article>
-                        <img
-                            src="assets/Schermafbeelding 2025-11-21 125008.png"
-                            alt="Fotomap kiezen"
-                        />
+                        <img src="assets/Stap1_NL.png" alt="Fotomap kiezen" />
                         <h3>1. Kies je fotomap</h3>
                         <p>
-                            Selecteer de fotomap van je SD-kaart (voor de beste
-                            prestaties kopieer je die best eerst naar de harde
-                            schijf). Feedie telt alle bestanden en toont je de
-                            knop om het scannen te starten. Heb je de map al
-                            eerder gescand, dan kan je meteen verder met de
-                            vorige resultaten via de cache.
+                            Selecteer de fotomap van je SD-kaart en kies of je
+                            subfolders mee wil nemen(voor de beste prestaties
+                            kopieer je die best eerst naar de harde schijf).
+                            Feedie telt alle bestanden en toont je de knop om
+                            het scannen te starten. Heb je de map al eerder
+                            gescand, dan kan je meteen verder met de vorige
+                            resultaten via de cache.
                         </p>
                     </article>
                     <article>
@@ -345,8 +340,8 @@
                         <h3>2. Scan de map om soorten te herkennen</h3>
                         <p>
                             Feedie toont de voortgang van het scannen. Voor
-                            grote kaarten duurt dit even, maar verwacht grofweg
-                            10 tot 20 seconden per 100 foto's op een standaard
+                            grote folders duurt dit even, maar verwacht grofweg
+                            5 tot 10 seconden per 100 foto's op een standaard
                             laptop.
                         </p>
                     </article>
@@ -395,7 +390,7 @@
                     </article>
                     <article class="placeholder">
                         <img
-                            src="assets/Schermafbeelding 2025-11-21 204631.png"
+                            src="assets/Stap6_NL.png"
                             alt="Instellingen dialoog"
                         />
                         <h3>6. Behoud de controle</h3>
